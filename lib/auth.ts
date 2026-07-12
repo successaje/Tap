@@ -36,32 +36,60 @@ export async function completeLoginFromRedirect(): Promise<AppUser> {
 
   const result = await magic.oauth2.getRedirectResult();
   const meta = result.magic.userMetadata;
+  console.debug("[tap] magic userMetadata shape:", meta);
   const info = (result.oauth?.userInfo ?? {}) as {
     name?: string;
     email?: string;
     picture?: string;
   };
 
-  // SDK v33 exposes a multi-chain `wallets` array; older versions had a flat
-  // `publicAddress`. Read defensively since the exact shape shifts across versions.
-  const flat = meta as unknown as {
-    publicAddress?: string | null;
-    wallets?: Array<{ walletType?: string; publicAddress?: string }>;
-  };
-  const address =
-    flat.wallets?.find((w) => w.walletType === "ETH")?.publicAddress ??
-    flat.publicAddress ??
-    undefined;
-
   const user: AppUser = {
     name: info.name || meta.email?.split("@")[0] || "You",
     email: meta.email || info.email || "",
-    address: address ?? undefined,
+    address: extractAddress(meta),
     avatar: info.picture,
   };
 
   localStorage.setItem(USER_KEY, JSON.stringify(user));
   return user;
+}
+
+/**
+ * Pull the embedded-wallet ETH address out of Magic's user metadata without
+ * assuming its shape — across SDK versions `wallets` has been an array, a
+ * chain-keyed object, or absent (flat `publicAddress`). The address is
+ * informational until Particle lands, so failure here must never break login.
+ */
+function extractAddress(meta: unknown): string | undefined {
+  try {
+    const m = meta as Record<string, unknown>;
+    const pick = (o: unknown): string | undefined => {
+      if (!o || typeof o !== "object") return undefined;
+      const r = o as Record<string, unknown>;
+      const addr = r.publicAddress ?? r.public_address;
+      return typeof addr === "string" && addr ? addr : undefined;
+    };
+
+    const w = m?.wallets;
+    if (Array.isArray(w)) {
+      const eth = w.find((x) => {
+        const t = (x as Record<string, unknown>)?.walletType ??
+          (x as Record<string, unknown>)?.wallet_type;
+        return t === "ETH" || t === "ethereum";
+      });
+      return pick(eth) ?? pick(w[0]);
+    }
+    if (w && typeof w === "object") {
+      // Chain-keyed object, e.g. { ethereum: { publicAddress } }.
+      for (const v of Object.values(w)) {
+        const addr = pick(v);
+        if (addr) return addr;
+      }
+    }
+    return pick(m);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Read (and clear) the step to resume after an auth redirect. */
