@@ -30,7 +30,7 @@ const GoogleG = () => (
   </svg>
 );
 
-/** (b) Login — mock Google sign-in. The link binds to this identity on success. */
+/** (b) Login — Google sign-in. The link binds to this identity on success. */
 export function LoginScreen({
   link,
   onSignedIn,
@@ -49,7 +49,8 @@ export function LoginScreen({
       // resumes at the claim moment on the way back, so this never returns.
       try {
         await beginGoogleLogin("moment");
-      } catch {
+      } catch (err) {
+        console.error("[tap] Google login failed:", err);
         setLoading(false);
       }
       return;
@@ -59,7 +60,7 @@ export function LoginScreen({
   }
 
   return (
-    <Screen className="px-6 pb-8 pt-5">
+    <Screen className="px-6 pb-8 pt-6">
       <motion.div
         variants={stagger}
         initial="hidden"
@@ -69,20 +70,33 @@ export function LoginScreen({
         <motion.div variants={rise}>
           <RippleMark size={64} animate />
         </motion.div>
-        <motion.h1
-          variants={rise}
-          className="mt-6 text-2xl font-semibold tracking-tight"
+
+        <motion.p variants={rise} className="mt-7 text-lg text-slate-500">
+          Sign in to claim
+        </motion.p>
+        <motion.p
+          layoutId="amount"
+          className="mt-1 text-5xl font-semibold leading-none tracking-tighter tabular-nums text-slate-900"
         >
-          Claim your {formatUsd(link.amountUsd)}
-        </motion.h1>
-        <motion.p variants={rise} className="mt-2 max-w-[16rem] text-slate-500">
-          Sign in once and this link is locked to you. No one else can claim it.
+          {formatUsd(link.amountUsd)}
+        </motion.p>
+
+        <motion.p
+          variants={rise}
+          className="mt-5 max-w-[17rem] text-sm leading-relaxed text-slate-400"
+        >
+          One sign-in locks this link to you — no one else can claim it. No
+          wallet, no seed phrase, nothing to install.
         </motion.p>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 28 }}
-        animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.3 } }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          transition: { ...springs.snappy, delay: 0.3 },
+        }}
         className="flex flex-col items-center gap-3"
       >
         <motion.button

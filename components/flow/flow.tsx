@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, LayoutGroup } from "framer-motion";
 import { ClaimScreen } from "@/components/flow/claim";
 import { LoginScreen } from "@/components/flow/login";
 import { ClaimMoment } from "@/components/flow/claim-moment";
@@ -30,6 +30,9 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
 
   useEffect(() => {
     if (!authEnabled) return;
+    // One-shot post-hydration read of session/local storage (SSR can't see it;
+    // a lazy initializer would cause a hydration mismatch). Intentional.
+    /* eslint-disable react-hooks/set-state-in-effect */
     const resume = consumeReturnStep();
     const user = getUser();
     if (resume && user) {
@@ -37,6 +40,7 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
       setStep(resume as Step);
     }
     setReady(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   if (!ready) {
@@ -49,9 +53,11 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
 
   return (
     // mode="popLayout" lets the incoming screen animate in while the outgoing
-    // one leaves, over an absolutely-positioned stack.
+    // one leaves, over an absolutely-positioned stack. LayoutGroup enables the
+    // shared-element morph: the amount (layoutId="amount") flies between screens.
     <div className="relative flex-1 overflow-hidden">
-      <AnimatePresence mode="popLayout" initial={false}>
+      <LayoutGroup>
+        <AnimatePresence mode="popLayout" initial={false}>
         {step === "claim" && (
           <ClaimScreen
             key="claim"
@@ -97,6 +103,7 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
           <SendScreen key="send" onClose={() => setStep("success")} />
         )}
       </AnimatePresence>
+      </LayoutGroup>
     </div>
   );
 }

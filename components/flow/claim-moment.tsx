@@ -8,10 +8,38 @@ import { formatUsd, type PaymentLink } from "@/lib/mock";
 
 type Phase = "ready" | "filling" | "landed";
 
+/** Celebration burst: small white dots radiating from the checkmark. */
+function Burst() {
+  const N = 10;
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      {Array.from({ length: N }, (_, i) => {
+        const angle = (i / N) * Math.PI * 2 - Math.PI / 2;
+        const dist = 90 + (i % 3) * 26;
+        return (
+          <motion.span
+            key={i}
+            className="absolute rounded-full bg-white"
+            style={{ width: i % 2 ? 6 : 9, height: i % 2 ? 6 : 9 }}
+            initial={{ x: 0, y: 0, opacity: 0.9, scale: 0.6 }}
+            animate={{
+              x: Math.cos(angle) * dist,
+              y: Math.sin(angle) * dist,
+              opacity: 0,
+              scale: 1,
+            }}
+            transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * (c) The claim moment. Tap the target → an accent ripple expands from the
  * exact touch point to fill the screen → the amount counts up → a checkmark
- * settles. This is the emotional peak of the flow.
+ * settles with a celebration burst. This is the emotional peak of the flow.
  */
 export function ClaimMoment({
   link,
@@ -45,6 +73,12 @@ export function ClaimMoment({
     }
     haptic(18);
     setPhase("filling");
+    // Advance on a timer matched to the ripple duration — deterministic, and
+    // immune to framer's completion callback being swallowed by layout passes.
+    window.setTimeout(() => {
+      haptic([0, 30, 40, 60]);
+      setPhase("landed");
+    }, 620);
   }
 
   return (
@@ -64,33 +98,42 @@ export function ClaimMoment({
             exit={{ opacity: 0, transition: { duration: 0.15 } }}
           >
             <p className="mb-1 text-slate-500">It&apos;s yours to claim</p>
-            <p className="mb-10 text-4xl font-semibold tracking-tight tabular-nums">
-              {formatUsd(link.amountUsd)}
-            </p>
-
-            <motion.button
-              onPointerDown={handleTap}
-              whileTap={{ scale: 0.94 }}
-              transition={springs.snappy}
-              className="relative flex size-56 items-center justify-center rounded-full bg-accent text-xl font-semibold text-white shadow-xl shadow-accent/30"
+            <motion.p
+              layoutId="amount"
+              className="mb-12 text-4xl font-semibold leading-none tracking-tighter tabular-nums text-slate-900"
             >
-              {/* Pulsing rings inviting the tap */}
-              {[0, 0.6].map((delay) => (
-                <motion.span
-                  key={delay}
-                  className="absolute inset-0 rounded-full border-2 border-accent"
-                  initial={{ scale: 1, opacity: 0.5 }}
-                  animate={{ scale: 1.35, opacity: 0 }}
-                  transition={{
-                    duration: 1.8,
-                    repeat: Infinity,
-                    ease: "easeOut",
-                    delay,
-                  }}
-                />
-              ))}
-              Tap to claim
-            </motion.button>
+              {formatUsd(link.amountUsd)}
+            </motion.p>
+
+            {/* Gentle float invites the tap */}
+            <motion.div
+              animate={{ y: [0, -7, 0] }}
+              transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <motion.button
+                onPointerDown={handleTap}
+                whileTap={{ scale: 0.93 }}
+                transition={springs.snappy}
+                className="relative flex size-56 items-center justify-center rounded-full bg-accent text-xl font-semibold text-white shadow-xl shadow-accent/30"
+              >
+                {/* Pulsing rings inviting the tap */}
+                {[0, 0.6].map((delay) => (
+                  <motion.span
+                    key={delay}
+                    className="absolute inset-0 rounded-full border-2 border-accent"
+                    initial={{ scale: 1, opacity: 0.5 }}
+                    animate={{ scale: 1.35, opacity: 0 }}
+                    transition={{
+                      duration: 1.8,
+                      repeat: Infinity,
+                      ease: "easeOut",
+                      delay,
+                    }}
+                  />
+                ))}
+                Tap to claim
+              </motion.button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -108,12 +151,6 @@ export function ClaimMoment({
           initial={{ width: 0, height: 0 }}
           animate={{ width: diameter, height: diameter }}
           transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
-          onAnimationComplete={() => {
-            if (phase === "filling") {
-              haptic([0, 30, 40, 60]);
-              setPhase("landed");
-            }
-          }}
         />
       )}
 
@@ -126,31 +163,41 @@ export function ClaimMoment({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { delay: 0.05 } }}
           >
-            <motion.div
-              className="flex size-20 items-center justify-center rounded-full bg-white/20"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1, transition: { ...springs.bouncy, delay: 0.05 } }}
-            >
-              <motion.svg
-                width="44"
-                height="44"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <div className="relative">
+              <Burst />
+              <motion.div
+                className="flex size-20 items-center justify-center rounded-full bg-white/20"
+                initial={{ scale: 0 }}
+                animate={{
+                  scale: 1,
+                  transition: { ...springs.bouncy, delay: 0.05 },
+                }}
               >
-                <motion.path
-                  d="M20 6L9 17l-5-5"
-                  initial={{ pathLength: 0 }}
-                  animate={{
-                    pathLength: 1,
-                    transition: { duration: 0.4, delay: 0.15, ease: "easeOut" },
-                  }}
-                />
-              </motion.svg>
-            </motion.div>
+                <motion.svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <motion.path
+                    d="M20 6L9 17l-5-5"
+                    initial={{ pathLength: 0 }}
+                    animate={{
+                      pathLength: 1,
+                      transition: {
+                        duration: 0.4,
+                        delay: 0.15,
+                        ease: "easeOut",
+                      },
+                    }}
+                  />
+                </motion.svg>
+              </motion.div>
+            </div>
 
             <motion.p
               className="mt-6 text-white/80"
@@ -159,15 +206,27 @@ export function ClaimMoment({
             >
               Landed
             </motion.p>
-            <CountUp
-              to={link.amountUsd}
-              duration={1}
-              className="mt-1 text-6xl font-semibold tracking-tight"
-            />
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{
+                scale: 1,
+                transition: { ...springs.bouncy, delay: 0.3 },
+              }}
+            >
+              <CountUp
+                to={link.amountUsd}
+                duration={1}
+                className="mt-1 block text-6xl font-semibold tracking-tighter"
+              />
+            </motion.div>
 
             <motion.button
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 1.2 } }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                transition: { ...springs.snappy, delay: 1.2 },
+              }}
               whileTap={{ scale: 0.96 }}
               onClick={onDone}
               className="absolute bottom-8 left-6 right-6 h-14 rounded-full bg-white text-lg font-semibold text-accent"

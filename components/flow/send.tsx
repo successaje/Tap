@@ -17,7 +17,8 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
   const [amount, setAmount] = useState("0");
   const [note, setNote] = useState("");
   const [link, setLink] = useState<PaymentLink | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false); // Share-button fallback feedback
+  const [cardCopied, setCardCopied] = useState(false); // link-card tap feedback
 
   const numeric = parseFloat(amount) || 0;
   const canSend = numeric > 0;
@@ -98,7 +99,9 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
                 key={amount}
                 initial={{ scale: 0.96 }}
                 animate={{ scale: 1, transition: springs.bouncy }}
-                className="text-6xl font-semibold tracking-tight tabular-nums"
+                className={`text-6xl font-semibold leading-none tracking-tighter tabular-nums ${
+                  canSend ? "text-slate-900" : "text-slate-300"
+                }`}
               >
                 {formatUsd(numeric)}
               </motion.p>
@@ -155,11 +158,23 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               {formatUsd(numeric)} waiting to be claimed
             </p>
 
-            <div className="mt-6 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
-              <p className="truncate font-mono text-sm text-slate-600">
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={async () => {
+                haptic(10);
+                await navigator.clipboard?.writeText(shareUrl).catch(() => {});
+                setCardCopied(true);
+                setTimeout(() => setCardCopied(false), 1600);
+              }}
+              className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
+            >
+              <p className="flex-1 truncate font-mono text-sm text-slate-600">
                 {shareUrl}
               </p>
-            </div>
+              <span className="shrink-0 text-xs font-semibold text-accent">
+                {cardCopied ? "Copied ✓" : "Copy"}
+              </span>
+            </motion.button>
             <p className="mt-2 text-xs text-slate-400">
               Binds to whoever claims it first. Unclaimed in 7 days? It comes
               back to you.

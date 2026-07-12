@@ -17,9 +17,9 @@ export function ClaimScreen({
   const days = daysUntilExpiry(link);
 
   return (
-    <Screen className="px-6 pb-6 pt-5">
+    <Screen className="px-6 pb-6 pt-6">
       <header className="flex items-center justify-center">
-        <Logo className="h-7" />
+        <Logo className="h-9" />
       </header>
 
       <motion.div
@@ -29,31 +29,43 @@ export function ClaimScreen({
         className="flex flex-1 flex-col items-center justify-center text-center"
       >
         <motion.div
-          variants={rise}
-          className="flex size-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-semibold text-accent"
+          variants={{
+            hidden: { opacity: 0, scale: 0.5, rotate: -12 },
+            show: {
+              opacity: 1,
+              scale: 1,
+              rotate: 0,
+              transition: springs.bouncy,
+            },
+          }}
+          className="flex size-[4.5rem] items-center justify-center rounded-full bg-blue-100 text-2xl font-semibold text-accent"
           aria-hidden
         >
           {link.senderName[0]}
         </motion.div>
 
-        <motion.p variants={rise} className="mt-5 text-lg text-slate-500">
+        <motion.p variants={rise} className="mt-6 text-lg text-slate-500">
           {link.senderName} sent you
         </motion.p>
 
         <motion.p
+          layoutId="amount"
           variants={{
             hidden: { opacity: 0, y: 24, scale: 0.92 },
             show: { opacity: 1, y: 0, scale: 1, transition: springs.bouncy },
           }}
-          className="mt-1 text-6xl font-semibold tracking-tight tabular-nums"
+          className="mt-1 text-[4.25rem] font-semibold leading-none tracking-tighter tabular-nums text-slate-900"
         >
           {formatUsd(link.amountUsd)}
         </motion.p>
 
         {link.note && (
           <motion.p
-            variants={rise}
-            className="mt-4 rounded-full bg-slate-100 px-4 py-1.5 text-sm text-slate-600"
+            variants={{
+              hidden: { opacity: 0, scale: 0.8, y: 12 },
+              show: { opacity: 1, scale: 1, y: 0, transition: springs.bouncy },
+            }}
+            className="mt-5 rounded-full bg-slate-100 px-4 py-1.5 text-sm text-slate-600"
           >
             {link.note}
           </motion.p>
@@ -62,14 +74,18 @@ export function ClaimScreen({
 
       <motion.footer
         initial={{ opacity: 0, y: 32 }}
-        animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.35 } }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          transition: { ...springs.snappy, delay: 0.35 },
+        }}
         className="flex flex-col items-center gap-3"
       >
         <motion.button
           whileTap={{ scale: 0.96 }}
           transition={springs.snappy}
           onClick={onContinue}
-          className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/20"
+          className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
         >
           Tap to claim
         </motion.button>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Screen } from "@/components/flow/screen";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
+import { getUser, type AppUser } from "@/lib/auth";
 import { formatUsd } from "@/lib/mock";
 
 /** (d) Success — balance confirmed + optional "add to home screen" prompt. */
@@ -17,11 +18,16 @@ export function SuccessScreen({
 }) {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [dismissed, setDismissed] = useState(false);
+  const [user, setUser] = useState<AppUser | null>(null);
+
+  // Post-hydration localStorage read; lazy init would mismatch SSR markup.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setUser(getUser()), []);
 
   const showInstall = !installed && !dismissed;
 
   return (
-    <Screen className="px-6 pb-8 pt-14">
+    <Screen className="px-6 pb-8 pt-16">
       <motion.div
         variants={stagger}
         initial="hidden"
@@ -35,25 +41,57 @@ export function SuccessScreen({
           }}
           className="flex size-16 items-center justify-center rounded-full bg-green-100"
         >
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="34"
+            height="34"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#16a34a"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M20 6L9 17l-5-5" />
           </svg>
         </motion.div>
 
-        <motion.p variants={rise} className="mt-5 text-slate-500">
+        <motion.p variants={rise} className="mt-6 text-slate-500">
           In your tap balance
         </motion.p>
         <motion.p
           variants={rise}
-          className="mt-1 text-5xl font-semibold tracking-tight tabular-nums"
+          className="mt-1 text-6xl font-semibold leading-none tracking-tighter tabular-nums text-slate-900"
         >
           {formatUsd(balance)}
         </motion.p>
+
+        {user?.email && (
+          <motion.div
+            variants={rise}
+            className="mt-5 flex items-center gap-2 rounded-full bg-slate-100 py-1.5 pl-1.5 pr-4"
+          >
+            {user.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatar}
+                alt=""
+                className="size-6 rounded-full"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="flex size-6 items-center justify-center rounded-full bg-accent text-xs font-semibold text-white">
+                {(user.name || user.email)[0]?.toUpperCase()}
+              </span>
+            )}
+            <span className="text-sm text-slate-600">{user.email}</span>
+          </motion.div>
+        )}
+
         <motion.p
           variants={rise}
-          className="mt-3 max-w-[15rem] text-sm text-slate-400"
+          className="mt-3 max-w-[16rem] text-sm text-slate-400"
         >
-          Ready to spend or send. Settled on-chain — you&apos;d never know.
+          Yours to spend or send. Settled on-chain — you&apos;d never know.
         </motion.p>
 
         <AnimatePresence>
@@ -61,16 +99,24 @@ export function SuccessScreen({
             <motion.div
               layout
               initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.2 } }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                transition: { ...springs.snappy, delay: 0.25 },
+              }}
               exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
-              className="mt-8 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left"
+              className="mt-auto w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left"
             >
               <div className="flex items-start gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/icon.svg" alt="" className="size-11 rounded-xl" />
+                <img
+                  src="/icons/icon.svg"
+                  alt=""
+                  className="size-11 rounded-xl"
+                />
                 <div className="flex-1">
-                  <p className="font-semibold">Add tap to your home screen</p>
-                  <p className="text-sm text-slate-500">
+                  <p className="font-semibold">Keep tap on your phone</p>
+                  <p className="mt-0.5 text-sm leading-snug text-slate-500">
                     {canInstall
                       ? "One tap to install. Opens full-screen, like an app."
                       : "Share → Add to Home Screen for the full-screen app."}
@@ -103,10 +149,14 @@ export function SuccessScreen({
 
       <motion.button
         initial={{ opacity: 0, y: 28 }}
-        animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.35 } }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          transition: { ...springs.snappy, delay: 0.35 },
+        }}
         whileTap={{ scale: 0.96 }}
         onClick={onSend}
-        className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/20"
+        className="mt-4 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
       >
         Send money back
       </motion.button>

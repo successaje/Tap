@@ -35,6 +35,8 @@ export function useInstallPrompt() {
       // iOS
       (window.navigator as unknown as { standalone?: boolean }).standalone
     ) {
+      // Post-hydration display-mode read; SSR can't know it. Intentional.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInstalled(true);
     }
     return () => {

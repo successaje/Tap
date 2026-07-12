@@ -64,14 +64,14 @@ export function RippleMark({
   );
 }
 
-/** Full lockup: ripple mark + "tap" wordmark. Uses the shipped brand SVG. */
+/** Ripple mark + "tap" wordmark. Tight-cropped copy of the brand SVG. */
 export function Logo({ className = "" }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/brand/tap-logo-light.svg"
+      src="/brand/tap-wordmark.svg"
       alt="tap"
-      className={className}
+      className={`select-none ${className}`}
       draggable={false}
     />
   );
