@@ -19,12 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      // The SDK's package.json "exports" omits a "types" condition, so bundler
-      // resolution can't find its shipped d.ts without this mapping.
-      "@particle-network/universal-account-sdk": [
-        "./node_modules/@particle-network/universal-account-sdk/dist/index.d.ts"
-      ]
+      "@/*": ["./*"]
     }
   },
   "include": [

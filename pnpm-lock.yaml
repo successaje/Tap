@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@particle-network/universal-account-sdk':
+    hash: b128692fe41287f99fe0ed137f3353802b10b0648cfb400c24985c1bce996cd0
+    path: patches/@particle-network__universal-account-sdk.patch
+
 importers:
 
   .:
@@ -13,7 +18,7 @@ importers:
         version: 15.10.0
       '@particle-network/universal-account-sdk':
         specifier: ^2.0.3
-        version: 2.0.3(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3)
+        version: 2.0.3(patch_hash=b128692fe41287f99fe0ed137f3353802b10b0648cfb400c24985c1bce996cd0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3)
       ethers:
         specifier: ^6.17.0
         version: 6.17.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -2947,7 +2952,7 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@particle-network/universal-account-sdk@2.0.3(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3)':
+  '@particle-network/universal-account-sdk@2.0.3(patch_hash=b128692fe41287f99fe0ed137f3353802b10b0648cfb400c24985c1bce996cd0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3)':
     dependencies:
       '@coral-xyz/anchor': 0.30.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@noble/hashes': 1.8.0
