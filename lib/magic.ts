@@ -27,3 +27,18 @@ export async function getMagic(): Promise<MagicWithOAuth | null> {
   }
   return instance;
 }
+
+/**
+ * Sign raw bytes with the Magic embedded-wallet EOA (personal_sign).
+ * Used to authorize Particle Universal Account transactions (rootHash).
+ */
+export async function signWithMagic(message: Uint8Array): Promise<string> {
+  const magic = await getMagic();
+  if (!magic) throw new Error("Magic is not configured");
+  const { BrowserProvider } = await import("ethers");
+  const provider = new BrowserProvider(
+    magic.rpcProvider as unknown as import("ethers").Eip1193Provider
+  );
+  const signer = await provider.getSigner();
+  return signer.signMessage(message);
+}

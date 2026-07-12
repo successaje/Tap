@@ -6,6 +6,7 @@ import { Screen } from "@/components/flow/screen";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { getUser, type AppUser } from "@/lib/auth";
+import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
 import { formatUsd } from "@/lib/mock";
 
 /** (d) Success — balance confirmed + optional "add to home screen" prompt. */
@@ -20,9 +21,25 @@ export function SuccessScreen({
   const [dismissed, setDismissed] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
 
+  const [unified, setUnified] = useState<UnifiedBalance | null>(null);
+
   // Post-hydration localStorage read; lazy init would mismatch SSR markup.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setUser(getUser()), []);
+
+  // Live unified balance across chains, once Particle is configured and the
+  // user has a real embedded-wallet address.
+  useEffect(() => {
+    const address = getUser()?.address;
+    if (!address) return;
+    let cancelled = false;
+    getUnifiedBalance(address).then((b) => {
+      if (!cancelled && b) setUnified(b);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const showInstall = !installed && !dismissed;
 
@@ -86,6 +103,19 @@ export function SuccessScreen({
             <span className="text-sm text-slate-600">{user.email}</span>
           </motion.div>
         )}
+
+        <AnimatePresence>
+          {unified && unified.totalUsd > 0 && (
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0, transition: springs.snappy }}
+              className="mt-3 rounded-full bg-blue-50 px-4 py-1.5 text-sm font-medium text-accent"
+            >
+              {formatUsd(unified.totalUsd)} unified across{" "}
+              {unified.chainCount} chain{unified.chainCount === 1 ? "" : "s"}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         <motion.p
           variants={rise}
