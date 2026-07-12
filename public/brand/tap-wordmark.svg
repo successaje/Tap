@@ -1,0 +1,6 @@
+<svg viewBox="222 52 240 186" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="392" cy="92" r="30" fill="none" stroke="#2563eb" stroke-width="1.25" opacity="0.35"/>
+  <circle cx="392" cy="92" r="20" fill="none" stroke="#2563eb" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="392" cy="92" r="11" fill="#2563eb"/>
+  <text x="340" y="200" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="130" fill="#0f172a" letter-spacing="-4">tap</text>
+</svg>

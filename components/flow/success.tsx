@@ -1,0 +1,115 @@
+"use client";
+
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Screen } from "@/components/flow/screen";
+import { springs, stagger, rise, haptic } from "@/lib/motion";
+import { useInstallPrompt } from "@/hooks/use-install-prompt";
+import { formatUsd } from "@/lib/mock";
+
+/** (d) Success — balance confirmed + optional "add to home screen" prompt. */
+export function SuccessScreen({
+  balance,
+  onSend,
+}: {
+  balance: number;
+  onSend: () => void;
+}) {
+  const { canInstall, installed, promptInstall } = useInstallPrompt();
+  const [dismissed, setDismissed] = useState(false);
+
+  const showInstall = !installed && !dismissed;
+
+  return (
+    <Screen className="px-6 pb-8 pt-14">
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="flex flex-1 flex-col items-center text-center"
+      >
+        <motion.div
+          variants={{
+            hidden: { scale: 0, opacity: 0 },
+            show: { scale: 1, opacity: 1, transition: springs.bouncy },
+          }}
+          className="flex size-16 items-center justify-center rounded-full bg-green-100"
+        >
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </motion.div>
+
+        <motion.p variants={rise} className="mt-5 text-slate-500">
+          In your tap balance
+        </motion.p>
+        <motion.p
+          variants={rise}
+          className="mt-1 text-5xl font-semibold tracking-tight tabular-nums"
+        >
+          {formatUsd(balance)}
+        </motion.p>
+        <motion.p
+          variants={rise}
+          className="mt-3 max-w-[15rem] text-sm text-slate-400"
+        >
+          Ready to spend or send. Settled on-chain — you&apos;d never know.
+        </motion.p>
+
+        <AnimatePresence>
+          {showInstall && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.2 } }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
+              className="mt-8 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left"
+            >
+              <div className="flex items-start gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/icon.svg" alt="" className="size-11 rounded-xl" />
+                <div className="flex-1">
+                  <p className="font-semibold">Add tap to your home screen</p>
+                  <p className="text-sm text-slate-500">
+                    {canInstall
+                      ? "One tap to install. Opens full-screen, like an app."
+                      : "Share → Add to Home Screen for the full-screen app."}
+                  </p>
+                </div>
+              </div>
+              {canInstall && (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={async () => {
+                      haptic();
+                      await promptInstall();
+                    }}
+                    className="h-10 flex-1 rounded-full bg-accent text-sm font-semibold text-white"
+                  >
+                    Add to home screen
+                  </button>
+                  <button
+                    onClick={() => setDismissed(true)}
+                    className="h-10 rounded-full px-4 text-sm font-medium text-slate-500"
+                  >
+                    Not now
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      <motion.button
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.35 } }}
+        whileTap={{ scale: 0.96 }}
+        onClick={onSend}
+        className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/20"
+      >
+        Send money back
+      </motion.button>
+    </Screen>
+  );
+}

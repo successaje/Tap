@@ -1,0 +1,7 @@
+<svg width="680" height="360" viewBox="0 0 680 360" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="392" cy="82" r="30" fill="none" stroke="#2563eb" stroke-width="1.25" opacity="0.35"/>
+  <circle cx="392" cy="82" r="20" fill="none" stroke="#2563eb" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="392" cy="82" r="11" fill="#2563eb"/>
+  <text x="340" y="190" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="130" fill="#0f172a" letter-spacing="-4">tap</text>
+  <text x="340" y="250" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="26" fill="#64748b" letter-spacing="0.5">send money by link. from any chain. to anyone.</text>
+</svg>
