@@ -13,6 +13,7 @@ export type AppUser = MockUser;
 
 const USER_KEY = "tap:user";
 const RETURN_KEY = "tap:auth-return";
+const RETURN_URL_KEY = "tap:auth-return-url";
 
 /**
  * Kick off Google OAuth via Magic. Redirects the browser away to Google and
@@ -23,6 +24,12 @@ export async function beginGoogleLogin(returnStep = "moment") {
   const magic = await getMagic();
   if (!magic) throw new Error("Magic is not configured");
   sessionStorage.setItem(RETURN_KEY, returnStep);
+  // Return to the exact page (incl. a claim link's #k fragment — it stays
+  // in sessionStorage and the browser, never in any redirect URL).
+  sessionStorage.setItem(
+    RETURN_URL_KEY,
+    window.location.pathname + window.location.search + window.location.hash
+  );
   await magic.oauth2.loginWithRedirect({
     provider: "google",
     redirectURI: `${window.location.origin}/callback`,
@@ -98,6 +105,14 @@ export function consumeReturnStep(): string | null {
   const v = sessionStorage.getItem(RETURN_KEY);
   if (v) sessionStorage.removeItem(RETURN_KEY);
   return v;
+}
+
+/** Read (and clear) the URL to return to after an auth redirect. */
+export function consumeReturnUrl(): string {
+  if (typeof window === "undefined") return "/";
+  const v = sessionStorage.getItem(RETURN_URL_KEY);
+  if (v) sessionStorage.removeItem(RETURN_URL_KEY);
+  return v || "/";
 }
 
 export async function logout() {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { RippleMark } from "@/components/logo";
-import { completeLoginFromRedirect } from "@/lib/auth";
+import { completeLoginFromRedirect, consumeReturnUrl } from "@/lib/auth";
 import { haptic } from "@/lib/motion";
 
 /**
@@ -22,7 +22,7 @@ export default function Callback() {
       .then(() => {
         if (cancelled) return;
         haptic();
-        router.replace("/");
+        router.replace(consumeReturnUrl());
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));

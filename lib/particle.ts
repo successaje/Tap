@@ -81,9 +81,39 @@ export async function getUnifiedBalance(
   }
 }
 
+export interface TransferReceipt {
+  transactionId: string;
+  explorerUrl: string;
+  /** USD amount actually moved (differs from requested when fees are deducted). */
+  sentUsd: number;
+  feeUsd: number;
+}
+
+/** Native USDC on Arbitrum One. */
+const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+
+const round2 = (n: number) => Math.floor(n * 100) / 100;
+
+async function createUsdcTransfer(
+  ua: UniversalAccount,
+  receiver: string,
+  amountUsd: number
+) {
+  const { CHAIN_ID } = await import("@particle-network/universal-account-sdk");
+  return ua.createTransferTransaction({
+    token: { chainId: CHAIN_ID.ARBITRUM_MAINNET_ONE, address: USDC_ARBITRUM },
+    amount: amountUsd.toFixed(2),
+    receiver,
+  });
+}
+
+function quotedFeeUsd(tx: { feeQuotes?: Array<{ fees?: { totals?: { feeTokenAmountInUSD?: string } } }> }): number {
+  return Number(tx.feeQuotes?.[0]?.fees?.totals?.feeTokenAmountInUSD ?? 0);
+}
+
 /**
  * Cross-chain USDC transfer settled on Arbitrum. The SDK pulls liquidity from
- * wherever the sender's primary assets live; the Magic EOA signs the rootHash.
+ * wherever the sender's primary assets live; the owner EOA signs the rootHash.
  * Returns the UniversalX activity URL for the receipt.
  */
 export async function transferOnArbitrum(
@@ -91,25 +121,75 @@ export async function transferOnArbitrum(
   receiver: string,
   amountUsd: number,
   signMessage: (message: Uint8Array) => Promise<string>
-): Promise<{ transactionId: string; explorerUrl: string }> {
+): Promise<TransferReceipt> {
   const ua = await getUniversalAccount(ownerAddress);
   if (!ua) throw new Error("Particle is not configured");
-
-  const { CHAIN_ID } = await import("@particle-network/universal-account-sdk");
   const { getBytes } = await import("ethers");
 
-  // Native USDC on Arbitrum One.
-  const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
-
-  const tx = await ua.createTransferTransaction({
-    token: { chainId: CHAIN_ID.ARBITRUM_MAINNET_ONE, address: USDC_ARBITRUM },
-    amount: String(amountUsd),
-    receiver,
-  });
+  const tx = await createUsdcTransfer(ua, receiver, amountUsd);
   const signature = await signMessage(getBytes(tx.rootHash));
   const result = await ua.sendTransaction(tx, signature);
   return {
     transactionId: result.transactionId,
     explorerUrl: `https://universalx.app/activity/details?id=${result.transactionId}`,
+    sentUsd: amountUsd,
+    feeUsd: quotedFeeUsd(tx),
   };
+}
+
+/**
+ * Sweep (almost) everything an account holds to `receiver` — the claim path.
+ * Fees come out of the same balance, so quote first, then transfer
+ * balance-minus-fees. Retries once with a wider fee buffer if the first
+ * attempt doesn't clear.
+ */
+export async function sweepAllToAddress(
+  ownerAddress: string,
+  receiver: string,
+  signMessage: (message: Uint8Array) => Promise<string>
+): Promise<TransferReceipt> {
+  const ua = await getUniversalAccount(ownerAddress);
+  if (!ua) throw new Error("Particle is not configured");
+  const { getBytes } = await import("ethers");
+
+  const primary = await ua.getPrimaryAssets();
+  const balanceUsd = Number(primary.totalAmountInUSD ?? 0);
+  if (balanceUsd <= 0.01) {
+    throw new Error("This link is empty — it may have already been claimed.");
+  }
+
+  // Quote fees against the full balance, then step the amount down.
+  let quote;
+  try {
+    quote = await createUsdcTransfer(ua, receiver, round2(balanceUsd));
+  } catch {
+    quote = null; // full-balance quote can be rejected outright; use buffers
+  }
+  const baseFee = quote ? quotedFeeUsd(quote) : 0;
+
+  const candidates = [
+    quote && baseFee > 0 ? round2(balanceUsd - baseFee * 1.1) : null,
+    round2(balanceUsd * 0.96),
+    round2(balanceUsd * 0.9),
+  ].filter((a): a is number => a !== null && a >= 0.01);
+
+  let lastErr: unknown = null;
+  for (const amount of candidates) {
+    try {
+      const tx = await createUsdcTransfer(ua, receiver, amount);
+      const signature = await signMessage(getBytes(tx.rootHash));
+      const result = await ua.sendTransaction(tx, signature);
+      return {
+        transactionId: result.transactionId,
+        explorerUrl: `https://universalx.app/activity/details?id=${result.transactionId}`,
+        sentUsd: amount,
+        feeUsd: quotedFeeUsd(tx),
+      };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error("Couldn't move the funds — please try again.");
 }

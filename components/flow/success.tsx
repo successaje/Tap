@@ -12,9 +12,12 @@ import { formatUsd } from "@/lib/mock";
 /** (d) Success — balance confirmed + optional "add to home screen" prompt. */
 export function SuccessScreen({
   balance,
+  explorerUrl,
   onSend,
 }: {
   balance: number;
+  /** Set when the claim really settled on-chain. */
+  explorerUrl?: string;
   onSend: () => void;
 }) {
   const { canInstall, installed, promptInstall } = useInstallPrompt();
@@ -123,6 +126,18 @@ export function SuccessScreen({
         >
           Yours to spend or send. Settled on-chain — you&apos;d never know.
         </motion.p>
+
+        {explorerUrl && (
+          <motion.a
+            variants={rise}
+            href={explorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 text-sm font-medium text-accent underline-offset-2 hover:underline"
+          >
+            View the on-chain receipt ↗
+          </motion.a>
+        )}
 
         <AnimatePresence>
           {showInstall && (

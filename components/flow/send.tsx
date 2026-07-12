@@ -1,30 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Screen } from "@/components/flow/screen";
 import { springs, haptic } from "@/lib/motion";
-import { createLink } from "@/lib/store";
-import { formatUsd, type PaymentLink } from "@/lib/mock";
+import { createLink, getUser } from "@/lib/store";
+import { canSendReal, createFundedLink } from "@/lib/links";
+import { getUnifiedBalance } from "@/lib/particle";
+import { formatUsd } from "@/lib/mock";
 
-type Phase = "compose" | "created";
+type Phase = "compose" | "funding" | "created";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"];
 
-/** (e) Send — create a new payment link to pay someone back. */
+const shorten = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** (e) Send — create a payment link. When Particle is live, the link is a real
+ * wallet and creating it genuinely moves money into it. */
 export function SendScreen({ onClose }: { onClose: () => void }) {
   const [phase, setPhase] = useState<Phase>("compose");
   const [amount, setAmount] = useState("0");
   const [note, setNote] = useState("");
-  const [link, setLink] = useState<PaymentLink | null>(null);
+  const [shareUrl, setShareUrl] = useState("");
+  const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false); // Share-button fallback feedback
   const [cardCopied, setCardCopied] = useState(false); // link-card tap feedback
+  const [addrCopied, setAddrCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Real-money context (post-mount reads of storage + live balance).
+  const [real, setReal] = useState(false);
+  const [wallet, setWallet] = useState<string | null>(null);
+  const [available, setAvailable] = useState<number | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe one-shot storage read
+    setReal(canSendReal());
+    const address = getUser()?.address;
+    if (!address) return;
+    setWallet(address);
+    let cancelled = false;
+    getUnifiedBalance(address).then((b) => {
+      if (!cancelled && b) setAvailable(b.totalUsd);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const numeric = parseFloat(amount) || 0;
-  const canSend = numeric > 0;
+  const canSend =
+    numeric > 0 && (!real || available === null || numeric <= available);
 
   function press(key: string) {
     haptic(10);
+    setError(null);
     setAmount((prev) => {
       if (key === "⌫") {
         const next = prev.slice(0, -1);
@@ -33,22 +63,42 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       if (key === ".") {
         return prev.includes(".") ? prev : prev + ".";
       }
-      // Limit to 2 decimals.
       if (prev.includes(".") && prev.split(".")[1]?.length >= 2) return prev;
-      const next = prev === "0" ? key : prev + key;
-      return next;
+      return prev === "0" ? key : prev + key;
     });
   }
 
-  function create() {
+  async function create() {
     if (!canSend) return;
     haptic(20);
-    const l = createLink(numeric, note.trim());
-    setLink(l);
-    setPhase("created");
+    setError(null);
+
+    if (!real) {
+      const mock = createLink(numeric, note.trim());
+      setShareUrl(`https://tap.cash/t/${mock.id}`);
+      setPhase("created");
+      return;
+    }
+
+    setPhase("funding");
+    try {
+      const link = await createFundedLink(numeric, note.trim() || undefined);
+      setShareUrl(link.url);
+      setExplorerUrl(link.explorerUrl);
+      haptic([0, 30, 40, 60]);
+      setPhase("created");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase("compose");
+    }
   }
 
-  const shareUrl = link ? `https://tap.cash/t/${link.id}` : "";
+  async function copy(text: string, done: (v: boolean) => void) {
+    haptic(10);
+    await navigator.clipboard?.writeText(text).catch(() => {});
+    done(true);
+    setTimeout(() => done(false), 1600);
+  }
 
   async function share() {
     haptic();
@@ -64,9 +114,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
         /* user cancelled — fall through to copy */
       }
     }
-    await navigator.clipboard?.writeText(shareUrl).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    await copy(shareUrl, setCopied);
   }
 
   return (
@@ -76,6 +124,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           className="-ml-2 flex size-9 items-center justify-center rounded-full text-slate-500 active:bg-slate-100"
           aria-label="Close"
+          disabled={phase === "funding"}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -86,7 +135,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       </header>
 
       <AnimatePresence mode="wait">
-        {phase === "compose" ? (
+        {phase === "compose" && (
           <motion.div
             key="compose"
             className="flex flex-1 flex-col"
@@ -100,8 +149,8 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
                 initial={{ scale: 0.96 }}
                 animate={{ scale: 1, transition: springs.bouncy }}
                 className={`text-6xl font-semibold leading-none tracking-tighter tabular-nums ${
-                  canSend ? "text-slate-900" : "text-slate-300"
-                }`}
+                  canSend || numeric === 0 ? "text-slate-900" : "text-red-400"
+                } ${numeric === 0 ? "text-slate-300" : ""}`}
               >
                 {formatUsd(numeric)}
               </motion.p>
@@ -112,6 +161,34 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
                 placeholder="What's it for?"
                 className="mt-4 rounded-full bg-slate-100 px-4 py-2 text-center text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
+
+              {real && (
+                <button
+                  onClick={() => wallet && copy(wallet, setAddrCopied)}
+                  className="mt-3 flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-xs text-slate-500"
+                >
+                  {available !== null && (
+                    <span className="font-semibold text-slate-700">
+                      {formatUsd(available)} available
+                    </span>
+                  )}
+                  {wallet && (
+                    <span className="font-mono">
+                      {addrCopied ? "address copied ✓" : shorten(wallet)}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-3 max-w-[19rem] text-center text-xs text-red-500"
+                >
+                  {error}
+                </motion.p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-x-2 gap-y-1">
@@ -132,12 +209,42 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               transition={springs.snappy}
               onClick={create}
               disabled={!canSend}
-              className="mt-3 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/20 transition-opacity disabled:opacity-40"
+              className="mt-3 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25 transition-opacity disabled:opacity-40"
             >
               Create link
             </motion.button>
           </motion.div>
-        ) : (
+        )}
+
+        {phase === "funding" && (
+          <motion.div
+            key="funding"
+            className="flex flex-1 flex-col items-center justify-center text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+          >
+            <div className="flex gap-2" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="size-3 rounded-full bg-accent"
+                  animate={{ opacity: [0.25, 1, 0.25], scale: [0.85, 1, 0.85] }}
+                  transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
+                />
+              ))}
+            </div>
+            <p className="mt-6 text-lg font-semibold">
+              Securing {formatUsd(numeric)} in your link
+            </p>
+            <p className="mt-1 max-w-[16rem] text-sm text-slate-500">
+              Moving real money — sourcing across chains, settling on Arbitrum.
+              Usually under a minute.
+            </p>
+          </motion.div>
+        )}
+
+        {phase === "created" && (
           <motion.div
             key="created"
             className="flex flex-1 flex-col items-center justify-center text-center"
@@ -157,15 +264,20 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
             <p className="mt-1 text-slate-500">
               {formatUsd(numeric)} waiting to be claimed
             </p>
+            {explorerUrl && (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 text-sm font-medium text-accent underline-offset-2 hover:underline"
+              >
+                Funded on-chain ↗
+              </a>
+            )}
 
             <motion.button
               whileTap={{ scale: 0.98 }}
-              onClick={async () => {
-                haptic(10);
-                await navigator.clipboard?.writeText(shareUrl).catch(() => {});
-                setCardCopied(true);
-                setTimeout(() => setCardCopied(false), 1600);
-              }}
+              onClick={() => copy(shareUrl, setCardCopied)}
               className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
             >
               <p className="flex-1 truncate font-mono text-sm text-slate-600">
@@ -184,7 +296,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={share}
-                className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/20"
+                className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
               >
                 {copied ? "Copied!" : "Share link"}
               </motion.button>

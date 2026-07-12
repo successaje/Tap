@@ -10,6 +10,8 @@ import { SendScreen } from "@/components/flow/send";
 import { RippleMark } from "@/components/logo";
 import { addToBalance, getBalance } from "@/lib/store";
 import { authEnabled, consumeReturnStep, getUser } from "@/lib/auth";
+import { claimFundedLink } from "@/lib/links";
+import type { TransferReceipt } from "@/lib/particle";
 import type { PaymentLink } from "@/lib/mock";
 
 type Step = "claim" | "login" | "moment" | "success" | "send";
@@ -20,10 +22,18 @@ type Step = "claim" | "login" | "moment" | "success" | "send";
  * Each mock action (signIn, addToBalance, createLink) is a seam the real SDKs
  * replace later.
  */
-export function Flow({ initialLink }: { initialLink: PaymentLink }) {
+export function Flow({
+  initialLink,
+  claimKey,
+}: {
+  initialLink: PaymentLink;
+  /** Present for real links: the throwaway key that owns the link's funds. */
+  claimKey?: string;
+}) {
   const [step, setStep] = useState<Step>("claim");
   const [link, setLink] = useState<PaymentLink>(initialLink);
   const [balance, setBalance] = useState(0);
+  const [receipt, setReceipt] = useState<TransferReceipt | null>(null);
   // With real auth, wait one tick to check for a redirect return before
   // painting — avoids flashing the claim screen before jumping to the moment.
   const [ready, setReady] = useState(!authEnabled);
@@ -82,10 +92,17 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
           <ClaimMoment
             key="moment"
             link={link}
-            onDone={() => {
+            claim={claimKey ? () => claimFundedLink(claimKey) : undefined}
+            onDone={(r) => {
               setLink((l) => ({ ...l, status: "claimed" }));
-              addToBalance(link.amountUsd);
-              setBalance(getBalance());
+              if (r) {
+                // Real claim: the money moved on-chain.
+                setReceipt(r);
+                setBalance(r.sentUsd);
+              } else {
+                addToBalance(link.amountUsd);
+                setBalance(getBalance());
+              }
               setStep("success");
             }}
           />
@@ -95,6 +112,7 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
           <SuccessScreen
             key="success"
             balance={balance}
+            explorerUrl={receipt?.explorerUrl}
             onSend={() => setStep("send")}
           />
         )}
