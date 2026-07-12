@@ -6,6 +6,7 @@ import { Screen } from "@/components/flow/screen";
 import { RippleMark } from "@/components/logo";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { signIn, type MockUser } from "@/lib/store";
+import { authEnabled, beginGoogleLogin } from "@/lib/auth";
 import { formatUsd, type PaymentLink } from "@/lib/mock";
 
 const GoogleG = () => (
@@ -43,6 +44,16 @@ export function LoginScreen({
     if (loading) return;
     haptic();
     setLoading(true);
+    if (authEnabled) {
+      // Real Magic: redirects to Google and returns via /callback. The flow
+      // resumes at the claim moment on the way back, so this never returns.
+      try {
+        await beginGoogleLogin("moment");
+      } catch {
+        setLoading(false);
+      }
+      return;
+    }
     const user = await signIn();
     onSignedIn(user);
   }

@@ -23,7 +23,7 @@ export function RippleMark({
           transition: {
             duration: 2.4,
             repeat: Infinity,
-            ease: "easeOut",
+            ease: "easeOut" as const,
             delay,
           },
         }

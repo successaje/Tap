@@ -8,6 +8,9 @@ import type { PaymentLink } from "@/lib/mock";
 export interface MockUser {
   name: string;
   email: string;
+  /** Present once real Magic auth is wired in (the embedded-wallet address). */
+  address?: string;
+  avatar?: string;
 }
 
 const USER_KEY = "tap:user";

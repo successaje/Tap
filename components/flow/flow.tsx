@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ClaimScreen } from "@/components/flow/claim";
 import { LoginScreen } from "@/components/flow/login";
 import { ClaimMoment } from "@/components/flow/claim-moment";
 import { SuccessScreen } from "@/components/flow/success";
 import { SendScreen } from "@/components/flow/send";
+import { RippleMark } from "@/components/logo";
 import { addToBalance, getBalance } from "@/lib/store";
+import { authEnabled, consumeReturnStep, getUser } from "@/lib/auth";
 import type { PaymentLink } from "@/lib/mock";
 
 type Step = "claim" | "login" | "moment" | "success" | "send";
@@ -22,6 +24,28 @@ export function Flow({ initialLink }: { initialLink: PaymentLink }) {
   const [step, setStep] = useState<Step>("claim");
   const [link, setLink] = useState<PaymentLink>(initialLink);
   const [balance, setBalance] = useState(0);
+  // With real auth, wait one tick to check for a redirect return before
+  // painting — avoids flashing the claim screen before jumping to the moment.
+  const [ready, setReady] = useState(!authEnabled);
+
+  useEffect(() => {
+    if (!authEnabled) return;
+    const resume = consumeReturnStep();
+    const user = getUser();
+    if (resume && user) {
+      setLink((l) => ({ ...l, status: "bound", boundTo: user.email }));
+      setStep(resume as Step);
+    }
+    setReady(true);
+  }, []);
+
+  if (!ready) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <RippleMark size={48} animate />
+      </div>
+    );
+  }
 
   return (
     // mode="popLayout" lets the incoming screen animate in while the outgoing
