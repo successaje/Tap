@@ -28,9 +28,9 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* The app renders inside a phone-width column; on real phones it IS the screen. */
 .phone-shell {
-  max-width: 390px;
+  width: 100%;
+  max-width: 480px; /* Expands to fit larger phones, caps out at tablet/desktop */
   margin-inline: auto;
   min-height: 100dvh;
   background: var(--background);
@@ -40,7 +40,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-@media (min-width: 431px) {
+@media (min-width: 481px) {
   .phone-shell {
     border-inline: 1px solid #e2e8f0;
   }
