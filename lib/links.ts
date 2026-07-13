@@ -33,9 +33,20 @@ export interface FundedLink {
 
 const SENT_KEY = "tap:sent-real";
 
-/** Real links are possible once Particle is live and a real user is signed in. */
+/**
+ * Real links are possible only when Particle is configured, a real user is
+ * signed in, AND we have successfully loaded a live balance (proving the SDK
+ * can reach its API). If the balance fetch failed (network error, bad keys),
+ * we silently fall back to the mock path so the app stays usable.
+ */
+let particleReachable: boolean | null = null;
+
+export function markParticleReachable(reachable: boolean) {
+  particleReachable = reachable;
+}
+
 export function canSendReal(): boolean {
-  return particleEnabled && !!getUser()?.address;
+  return particleEnabled && !!getUser()?.address && particleReachable === true;
 }
 
 /**

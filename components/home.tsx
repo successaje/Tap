@@ -8,6 +8,7 @@ import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
 import { getBalance } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
+import { markParticleReachable } from "@/lib/links";
 import { getActivity, timeAgo, type ActivityItem } from "@/lib/activity";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings, updateSettings } from "@/lib/settings";
@@ -50,7 +51,14 @@ export function Home() {
     if (!u?.address) return;
     let cancelled = false;
     getUnifiedBalance(u.address).then((b) => {
-      if (!cancelled && b) setUnified(b);
+      if (!cancelled) {
+        if (b) {
+          setUnified(b);
+          markParticleReachable(true);
+        } else {
+          markParticleReachable(false);
+        }
+      }
     });
     return () => {
       cancelled = true;
