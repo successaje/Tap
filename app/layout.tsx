@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SwRegister } from "@/components/sw-register";
+import { BottomNav } from "@/components/bottom-nav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,7 +50,10 @@ export default function RootLayout({
     >
       <body>
         <SwRegister />
-        <div className="phone-shell">{children}</div>
+        <div className="phone-shell">
+          {children}
+          <BottomNav />
+        </div>
       </body>
     </html>
   );

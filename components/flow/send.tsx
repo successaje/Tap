@@ -10,7 +10,7 @@ import { createLink, getUser } from "@/lib/store";
 import { canSendReal, createFundedLink } from "@/lib/links";
 import { getUnifiedBalance } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
-import { formatUsd } from "@/lib/mock";
+import { formatUsd, formatLocalInput, localToUsd } from "@/lib/mock";
 
 type Phase = "compose" | "funding" | "created";
 
@@ -49,9 +49,10 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  const numeric = parseFloat(amount) || 0;
+  const numericLocal = parseFloat(amount) || 0;
+  const numericUsd = localToUsd(numericLocal);
   const canSend =
-    numeric > 0 && (!real || available === null || numeric <= available);
+    numericLocal > 0 && (!real || available === null || numericUsd <= available);
 
   function press(key: string) {
     setError(null);
@@ -64,11 +65,11 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
     setError(null);
 
     if (!real) {
-      const mock = createLink(numeric, note.trim());
+      const mock = createLink(numericUsd, note.trim());
       setShareUrl(`https://tap.cash/t/${mock.id}`);
       recordActivity({
         type: "sent",
-        amountUsd: numeric,
+        amountUsd: numericUsd,
         counterparty: "Payment link",
         note: note.trim() || undefined,
         status: "awaiting-claim",
@@ -79,12 +80,12 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
 
     setPhase("funding");
     try {
-      const link = await createFundedLink(numeric, note.trim() || undefined);
+      const link = await createFundedLink(numericUsd, note.trim() || undefined);
       setShareUrl(link.url);
       setExplorerUrl(link.explorerUrl);
       recordActivity({
         type: "sent",
-        amountUsd: numeric,
+        amountUsd: numericUsd,
         counterparty: "Payment link",
         note: note.trim() || undefined,
         status: "awaiting-claim",
@@ -113,7 +114,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       try {
         await navigator.share({
           title: "tap",
-          text: `I sent you ${formatUsd(numeric)} — tap to claim`,
+          text: `I sent you ${formatUsd(numericUsd)} — tap to claim`,
           url: shareUrl,
         });
         return;
@@ -156,10 +157,10 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
                 initial={{ scale: 0.96 }}
                 animate={{ scale: 1, transition: springs.bouncy }}
                 className={`text-6xl font-semibold leading-none tracking-tighter tabular-nums ${
-                  canSend || numeric === 0 ? "text-slate-900" : "text-red-400"
-                } ${numeric === 0 ? "text-slate-300" : ""}`}
+                  canSend || numericLocal === 0 ? "text-slate-900" : "text-red-400"
+                } ${numericLocal === 0 ? "text-slate-300" : ""}`}
               >
-                {formatUsd(numeric)}
+                {formatLocalInput(numericLocal)}
               </motion.p>
               <input
                 value={note}
@@ -168,6 +169,16 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
                 placeholder="What's it for?"
                 className="mt-4 rounded-full bg-slate-100 px-4 py-2 text-center text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
+
+              <button 
+                onClick={() => {
+                  haptic(10);
+                  setAmount(real && available !== null ? Math.floor(available * 100).toString() : "27500");
+                }}
+                className="mt-4 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-500 active:scale-95 transition-transform"
+              >
+                Use Max
+              </button>
 
               {real && (
                 <button
@@ -205,7 +216,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               transition={springs.snappy}
               onClick={create}
               disabled={!canSend}
-              className="mt-3 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25 transition-opacity disabled:opacity-40"
+              className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white transition-opacity disabled:opacity-40"
             >
               Create link
             </motion.button>
@@ -231,7 +242,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               ))}
             </div>
             <p className="mt-6 text-lg font-semibold">
-              Securing {formatUsd(numeric)} in your link
+              Securing {formatUsd(numericUsd)} in your link
             </p>
             <p className="mt-1 max-w-[16rem] text-sm text-slate-500">
               Moving real money — sourcing across chains, settling on Arbitrum.
@@ -258,7 +269,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               Link ready
             </h2>
             <p className="mt-1 text-slate-500">
-              {formatUsd(numeric)} waiting to be claimed
+              {formatUsd(numericUsd)} waiting to be claimed
             </p>
             {explorerUrl && (
               <a
@@ -296,7 +307,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={share}
-                className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+                className="h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
               >
                 {copied ? "Copied!" : "Share link"}
               </motion.button>

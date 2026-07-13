@@ -85,7 +85,7 @@ export function ClaimScreen({
           whileTap={{ scale: 0.96 }}
           transition={springs.snappy}
           onClick={onContinue}
-          className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+          className="h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
         >
           Tap to claim
         </motion.button>

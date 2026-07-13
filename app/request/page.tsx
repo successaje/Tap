@@ -7,7 +7,7 @@ import { Keypad, applyKey } from "@/components/keypad";
 import { PaymentQR } from "@/components/qr";
 import { springs, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
-import { formatUsd } from "@/lib/mock";
+import { formatUsd, formatLocalInput, localToUsd } from "@/lib/mock";
 
 /** Request money: share a link that opens prefilled pay for the other side. */
 export default function RequestPage() {
@@ -23,7 +23,8 @@ export default function RequestPage() {
     setUser(getUser() ?? null);
   }, []);
 
-  const numeric = parseFloat(amount) || 0;
+  const numericLocal = parseFloat(amount) || 0;
+  const numericUsd = localToUsd(numericLocal);
 
   function create() {
     if (!user?.address) return;
@@ -32,7 +33,7 @@ export default function RequestPage() {
       to: user.address,
       from: user.name || "A friend",
     });
-    if (numeric > 0) params.set("a", numeric.toFixed(2));
+    if (numericUsd > 0) params.set("a", numericUsd.toFixed(2));
     if (note.trim()) params.set("n", note.trim());
     setCreated(`${window.location.origin}/pay?${params.toString()}`);
   }
@@ -44,8 +45,8 @@ export default function RequestPage() {
         await navigator.share({
           title: "tap",
           text:
-            numeric > 0
-              ? `Requesting ${formatUsd(numeric)} on tap`
+            numericLocal > 0
+              ? `Requesting ${formatUsd(numericUsd)} on tap`
               : "Pay me on tap",
           url,
         });
@@ -106,10 +107,10 @@ export default function RequestPage() {
                   initial={{ scale: 0.96 }}
                   animate={{ scale: 1, transition: springs.bouncy }}
                   className={`text-6xl font-semibold leading-none tracking-tighter tabular-nums ${
-                    numeric === 0 ? "text-slate-300" : "text-slate-900"
+                    numericLocal === 0 ? "text-slate-300" : "text-slate-900"
                   }`}
                 >
-                  {formatUsd(numeric)}
+                  {formatLocalInput(numericLocal)}
                 </motion.p>
                 <p className="mt-2 text-xs text-slate-400">
                   Leave at $0.00 to let them choose the amount
@@ -129,7 +130,7 @@ export default function RequestPage() {
                 whileTap={{ scale: 0.97 }}
                 transition={springs.snappy}
                 onClick={create}
-                className="mt-3 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+                className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
               >
                 Create request
               </motion.button>
@@ -152,8 +153,8 @@ export default function RequestPage() {
                 Request ready
               </h2>
               <p className="mt-1 text-slate-500">
-                {numeric > 0
-                  ? `Asking for ${formatUsd(numeric)}`
+                {numericLocal > 0
+                  ? `Asking for ${formatUsd(numericUsd)}`
                   : "They choose the amount"}
               </p>
 
@@ -177,7 +178,7 @@ export default function RequestPage() {
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={() => share(created)}
-                  className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+                  className="h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
                 >
                   {copied ? "Copied!" : "Share request"}
                 </motion.button>

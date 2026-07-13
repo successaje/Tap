@@ -25,6 +25,9 @@ importers:
       framer-motion:
         specifier: ^12.42.2
         version: 12.42.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      lucide-react:
+        specifier: ^1.24.0
+        version: 1.24.0(react@19.2.4)
       magic-sdk:
         specifier: ^33.9.0
         version: 33.9.0
@@ -1933,6 +1936,11 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  lucide-react@1.24.0:
+    resolution: {integrity: sha512-YT6mBD8lGKkg4nM39enlm94/sfJIiW0YKUT60fBy4YK8tai31ylg1VhGNWxkpSKHo9UagfnZqwIff3HTDQwXeA==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   magic-sdk@33.9.0:
     resolution: {integrity: sha512-ZM46Jqeudi8W/dCqlypgIAQi+jVOGtXsokDYsZ8mHQiAfHE2b2pLaucu9X/qhrsFkFZ0rjOudZOPxuOhysdm4g==}
@@ -4578,6 +4586,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.24.0(react@19.2.4):
+    dependencies:
+      react: 19.2.4
 
   magic-sdk@33.9.0:
     dependencies:

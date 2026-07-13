@@ -75,8 +75,8 @@ export async function getUnifiedBalance(
       chainCount: chains.size,
       assetCount,
     };
-  } catch (err) {
-    console.error("[tap] unified balance failed:", err);
+  } catch {
+    // Silently fall back to mock balance if Particle SDK fails (e.g., Network Error or invalid keys)
     return null;
   }
 }

@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CountUp } from "@/components/count-up";
 import { springs, haptic } from "@/lib/motion";
-import { formatUsd, type PaymentLink } from "@/lib/mock";
+import { formatCurrency, getExchangeRates } from "@/lib/currency";
+import { getSettings, defaultSettings, type Settings } from "@/lib/settings";
+import type { PaymentLink } from "@/lib/mock";
 import type { TransferReceipt } from "@/lib/particle";
 
 type Phase = "ready" | "filling" | "processing" | "landed" | "error";
@@ -61,6 +63,16 @@ export function ClaimMoment({
 
   // Diameter large enough that a ripple from any point covers the whole shell.
   const [diameter, setDiameter] = useState(1200);
+
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [rates, setRates] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    // Post-hydration reads of local prefs + rates (SSR can't see them).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSettings(getSettings());
+    getExchangeRates().then(setRates);
+  }, []);
 
   function handleTap(e: React.PointerEvent) {
     if (phase !== "ready") return;
@@ -132,7 +144,7 @@ export function ClaimMoment({
               layoutId="amount"
               className="mb-12 text-4xl font-semibold leading-none tracking-tighter tabular-nums text-slate-900"
             >
-              {formatUsd(link.amountUsd)}
+              {formatCurrency(link.amountUsd, settings.currency, rates)}
             </motion.p>
 
             {/* Gentle float invites the tap */}

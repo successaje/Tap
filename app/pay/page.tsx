@@ -10,7 +10,7 @@ import { getUser, beginGoogleLogin, authEnabled, type AppUser } from "@/lib/auth
 import { signWithMagic } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
-import { formatUsd } from "@/lib/mock";
+import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 interface PayRequest {
   to: string;
@@ -47,12 +47,13 @@ export default function PayPage() {
       amountUsd,
       note: q.get("n") || undefined,
     });
-    if (amountUsd > 0) setAmount(amountUsd.toFixed(2));
+    if (amountUsd > 0) setAmount(usdToLocal(amountUsd).toFixed(2));
     setUser(getUser());
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  const numeric = parseFloat(amount) || 0;
+  const numericLocal = parseFloat(amount) || 0;
+  const numericUsd = localToUsd(numericLocal);
   const fixed = (req?.amountUsd ?? 0) > 0;
 
   async function signIn() {
@@ -67,7 +68,7 @@ export default function PayPage() {
   }
 
   async function pay() {
-    if (!req || numeric <= 0) return;
+    if (!req || numericLocal <= 0) return;
     haptic(20);
     setPhase("paying");
     try {
@@ -76,7 +77,7 @@ export default function PayPage() {
         const receipt = await transferOnArbitrum(
           user.address,
           req.to,
-          numeric,
+          numericUsd,
           signWithMagic
         );
         url = receipt.explorerUrl;
@@ -86,7 +87,7 @@ export default function PayPage() {
       }
       recordActivity({
         type: "sent",
-        amountUsd: numeric,
+        amountUsd: numericUsd,
         counterparty: req.from,
         note: req.note,
         status: "settled",
@@ -144,10 +145,10 @@ export default function PayPage() {
               <motion.p
                 variants={rise}
                 className={`mt-1 text-6xl font-semibold leading-none tracking-tighter tabular-nums ${
-                  numeric === 0 ? "text-slate-300" : "text-slate-900"
+                  numericLocal === 0 ? "text-slate-300" : "text-slate-900"
                 }`}
               >
-                {formatUsd(numeric)}
+                {formatLocalInput(numericLocal)}
               </motion.p>
               {req.note && (
                 <motion.p
@@ -166,10 +167,10 @@ export default function PayPage() {
                 variants={rise}
                 whileTap={{ scale: 0.96 }}
                 onClick={pay}
-                disabled={numeric <= 0}
-                className="mt-3 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25 disabled:opacity-40"
+                disabled={numericLocal <= 0}
+                className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-40"
               >
-                Pay {numeric > 0 ? formatUsd(numeric) : ""}
+                Pay {numericLocal > 0 ? formatUsd(numericUsd) : ""}
               </motion.button>
             ) : (
               <motion.button
@@ -177,7 +178,7 @@ export default function PayPage() {
                 whileTap={{ scale: 0.96 }}
                 onClick={signIn}
                 disabled={loggingIn || !authEnabled}
-                className="mt-3 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25 disabled:opacity-70"
+                className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-70"
               >
                 {loggingIn ? "Opening Google…" : "Sign in to pay"}
               </motion.button>
@@ -198,7 +199,7 @@ export default function PayPage() {
           >
             <RippleMark size={56} animate />
             <p className="mt-6 text-lg font-semibold">
-              Paying {formatUsd(numeric)}…
+              Paying {formatUsd(numericUsd)}…
             </p>
             <p className="mt-1 text-sm text-slate-500">
               Sourcing across chains &middot; settling on Arbitrum
@@ -223,7 +224,7 @@ export default function PayPage() {
               </svg>
             </motion.div>
             <p className="mt-5 text-2xl font-semibold tracking-tight">
-              Paid {formatUsd(numeric)}
+              Paid {formatUsd(numericUsd)}
             </p>
             <p className="mt-1 text-slate-500">to {req.from}</p>
             {explorerUrl && (

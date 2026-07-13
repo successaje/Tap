@@ -1,6 +1,9 @@
 // Mock data layer. Every SDK integration (Magic, Particle, Arbitrum) will
 // eventually replace pieces of this file — the UI only talks to these shapes.
 
+import { getSettings } from "@/lib/settings";
+import { formatCurrency } from "@/lib/currency";
+
 /**
  * Lifecycle of a payment link:
  * - "unclaimed": live, waiting for a recipient
@@ -45,9 +48,60 @@ export function daysUntilExpiry(link: PaymentLink): number {
   return Math.max(0, Math.ceil((Date.parse(link.expiresAt) - Date.now()) / DAY));
 }
 
-export function formatUsd(amount: number): string {
-  return amount.toLocaleString("en-US", {
+export function formatUsd(amountUsd: number): string {
+  if (typeof window === "undefined") {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+    }).format(amountUsd);
+  }
+  
+  const currency = getSettings().currency;
+  let rates = undefined;
+  try {
+    const cached = window.localStorage.getItem("tap:rates");
+    if (cached) rates = JSON.parse(cached);
+  } catch {}
+
+  return formatCurrency(amountUsd, currency, rates);
+}
+
+export function formatLocalInput(amountLocal: number): string {
+  if (typeof window === "undefined") {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+    }).format(amountLocal);
+  }
+  
+  const currency = getSettings().currency;
+  const hideDecimals = ["JPY", "NGN", "ARS"].includes(currency);
+  return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: "USD",
-  });
+    currency,
+    minimumFractionDigits: hideDecimals ? 0 : 2,
+    maximumFractionDigits: hideDecimals ? 0 : 2,
+  }).format(amountLocal);
+}
+
+export function getRate(): number {
+  if (typeof window === "undefined") return 1;
+  const currency = getSettings().currency;
+  if (currency === "USD") return 1; // base unit — never off-by-a-fraction
+  try {
+    const cached = window.localStorage.getItem("tap:rates");
+    if (cached) {
+      const rates = JSON.parse(cached);
+      return rates[currency] || 1;
+    }
+  } catch {}
+  return 1;
+}
+
+export function localToUsd(amountLocal: number): number {
+  return amountLocal / getRate();
+}
+
+export function usdToLocal(amountUsd: number): number {
+  return amountUsd * getRate();
 }

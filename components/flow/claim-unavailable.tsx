@@ -85,7 +85,7 @@ export function ClaimUnavailable({
         variants={rise}
         whileTap={{ scale: 0.97 }}
         onClick={() => router.push("/")}
-        className="h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+        className="h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
       >
         Open tap
       </motion.button>

@@ -98,7 +98,7 @@ export function Onboarding({
             animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.4 } }}
             whileTap={{ scale: 0.97 }}
             onClick={finish}
-            className="mt-8 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+            className="mt-8 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
           >
             Start using tap
           </motion.button>

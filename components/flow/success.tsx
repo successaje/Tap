@@ -8,7 +8,8 @@ import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { getUser, type AppUser } from "@/lib/auth";
 import { markOnboarded } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
-import { formatUsd } from "@/lib/mock";
+import { formatCurrency, getExchangeRates } from "@/lib/currency";
+import { getSettings, defaultSettings, type Settings } from "@/lib/settings";
 
 /** (d) Success — balance confirmed + optional "add to home screen" prompt. */
 export function SuccessScreen({
@@ -26,6 +27,8 @@ export function SuccessScreen({
   const [user, setUser] = useState<AppUser | null>(null);
 
   const [unified, setUnified] = useState<UnifiedBalance | null>(null);
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [rates, setRates] = useState<Record<string, number>>({});
 
   // Post-hydration localStorage read; lazy init would mismatch SSR markup.
   useEffect(() => {
@@ -33,6 +36,8 @@ export function SuccessScreen({
     setUser(getUser());
     // Reaching success IS the "you're in" moment — skip the welcome later.
     markOnboarded();
+    setSettings(getSettings());
+    getExchangeRates().then(setRates);
   }, []);
 
   // Live unified balance across chains, once Particle is configured and the
@@ -87,7 +92,7 @@ export function SuccessScreen({
           variants={rise}
           className="mt-1 text-6xl font-semibold leading-none tracking-tighter tabular-nums text-slate-900"
         >
-          {formatUsd(balance)}
+          {formatCurrency(balance, settings.currency, rates)}
         </motion.p>
 
         {user?.email && (
@@ -119,7 +124,7 @@ export function SuccessScreen({
               animate={{ opacity: 1, y: 0, transition: springs.snappy }}
               className="mt-3 rounded-full bg-blue-50 px-4 py-1.5 text-sm font-medium text-accent"
             >
-              {formatUsd(unified.totalUsd)} unified across{" "}
+              {formatCurrency(unified.totalUsd, settings.currency, rates)} unified across{" "}
               {unified.chainCount} chain{unified.chainCount === 1 ? "" : "s"}
             </motion.p>
           )}
@@ -206,7 +211,7 @@ export function SuccessScreen({
         }}
         whileTap={{ scale: 0.96 }}
         onClick={onSend}
-        className="mt-4 h-14 w-full rounded-full bg-accent text-lg font-semibold text-white shadow-lg shadow-accent/25"
+        className="mt-4 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
       >
         Send money back
       </motion.button>
