@@ -64,7 +64,16 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
     haptic(20);
     setError(null);
 
+    console.log("[tap:send] === CREATE LINK DEBUG ===");
+    console.log("[tap:send] amount (raw string):", amount);
+    console.log("[tap:send] numericLocal:", numericLocal);
+    console.log("[tap:send] numericUsd:", numericUsd);
+    console.log("[tap:send] real:", real);
+    console.log("[tap:send] canSendReal():", canSendReal());
+    console.log("[tap:send] available:", available);
+
     if (!real) {
+      console.log("[tap:send] Taking MOCK path");
       const mock = createLink(numericUsd, note.trim());
       setShareUrl(`https://tap.cash/t/${mock.id}`);
       recordActivity({
@@ -78,9 +87,11 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       return;
     }
 
+    console.log("[tap:send] Taking REAL Particle path");
     setPhase("funding");
     try {
       const link = await createFundedLink(numericUsd, note.trim() || undefined);
+      console.log("[tap:send] Real link created:", link);
       setShareUrl(link.url);
       setExplorerUrl(link.explorerUrl);
       recordActivity({
@@ -96,6 +107,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       haptic([0, 30, 40, 60]);
       setPhase("created");
     } catch (err) {
+      console.error("[tap:send] REAL path error:", err);
       setError(err instanceof Error ? err.message : String(err));
       setPhase("compose");
     }
