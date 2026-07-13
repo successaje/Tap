@@ -15,15 +15,23 @@ const USER_KEY = "tap:user";
 const RETURN_KEY = "tap:auth-return";
 const RETURN_URL_KEY = "tap:auth-return-url";
 
+/** True when an OAuth round trip left a flow resume pending. */
+export function hasPendingResume(): boolean {
+  return (
+    typeof window !== "undefined" && !!sessionStorage.getItem(RETURN_KEY)
+  );
+}
+
 /**
  * Kick off Google OAuth via Magic. Redirects the browser away to Google and
- * back to /callback, so this never resolves in-page. `returnStep` is stashed so
- * the flow can resume where it left off after the round trip.
+ * back to /callback, so this never resolves in-page. `returnStep` (optional)
+ * is stashed so the hero flow can resume where it left off after the trip;
+ * other pages rely on the return URL alone.
  */
-export async function beginGoogleLogin(returnStep = "moment") {
+export async function beginGoogleLogin(returnStep?: string) {
   const magic = await getMagic();
   if (!magic) throw new Error("Magic is not configured");
-  sessionStorage.setItem(RETURN_KEY, returnStep);
+  if (returnStep) sessionStorage.setItem(RETURN_KEY, returnStep);
   // Return to the exact page (incl. a claim link's #k fragment — it stays
   // in sessionStorage and the browser, never in any redirect URL).
   sessionStorage.setItem(

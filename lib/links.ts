@@ -144,3 +144,40 @@ export async function claimFundedLink(
     wallet.signMessage(message)
   );
 }
+
+export interface SentLinkRecord extends FundedLink {
+  privateKey: string;
+  reclaimed?: boolean;
+}
+
+/** Sender-side records of real links created on this device. */
+export function getSentLinks(): SentLinkRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(SENT_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Pull an unclaimed link's funds back to the sender — same sweep as a claim,
+ * just signed with the key we kept. Fails with "link is empty" if it was
+ * already claimed.
+ */
+export async function reclaimFundedLink(
+  linkId: string
+): Promise<TransferReceipt> {
+  const record = getSentLinks().find((l) => l.id === linkId);
+  if (!record) throw new Error("Link not found on this device");
+  const receipt = await claimFundedLink(record.privateKey);
+  window.localStorage.setItem(
+    SENT_KEY,
+    JSON.stringify(
+      getSentLinks().map((l) =>
+        l.id === linkId ? { ...l, reclaimed: true } : l
+      )
+    )
+  );
+  return receipt;
+}

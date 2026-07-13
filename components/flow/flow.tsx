@@ -11,6 +11,7 @@ import { RippleMark } from "@/components/logo";
 import { addToBalance, getBalance } from "@/lib/store";
 import { authEnabled, consumeReturnStep, getUser } from "@/lib/auth";
 import { claimFundedLink } from "@/lib/links";
+import { recordActivity } from "@/lib/activity";
 import type { TransferReceipt } from "@/lib/particle";
 import type { PaymentLink } from "@/lib/mock";
 
@@ -103,6 +104,15 @@ export function Flow({
                 addToBalance(link.amountUsd);
                 setBalance(getBalance());
               }
+              recordActivity({
+                type: "received",
+                amountUsd: r?.sentUsd ?? link.amountUsd,
+                counterparty: link.senderName,
+                note: link.note,
+                status: "settled",
+                explorerUrl: r?.explorerUrl,
+                txId: r?.transactionId,
+              });
               setStep("success");
             }}
           />
