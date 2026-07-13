@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Screen } from "@/components/flow/screen";
 import { Keypad, applyKey } from "@/components/keypad";
+import { PaymentQR } from "@/components/qr";
 import { springs, haptic } from "@/lib/motion";
 import { createLink, getUser } from "@/lib/store";
 import { canSendReal, createFundedLink } from "@/lib/links";
@@ -270,10 +271,14 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
               </a>
             )}
 
+            <div className="mt-5">
+              <PaymentQR value={shareUrl} size={176} caption="Scan to claim" />
+            </div>
+
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={() => copy(shareUrl, setCardCopied)}
-              className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
+              className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
             >
               <p className="flex-1 truncate font-mono text-sm text-slate-600">
                 {shareUrl}

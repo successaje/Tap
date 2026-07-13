@@ -2,17 +2,13 @@
 
 import { use, useEffect, useState } from "react";
 import { Flow } from "@/components/flow/flow";
-import { Logo } from "@/components/logo";
-import { parseClaimLink, type ClaimableLink } from "@/lib/links";
+import { ClaimUnavailable } from "@/components/flow/claim-unavailable";
+import { parseClaimLink, getLinkBalance, type ClaimableLink } from "@/lib/links";
+import { particleEnabled } from "@/lib/particle";
 import type { PaymentLink } from "@/lib/mock";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/**
- * Real claim links: /t/<id>?from=<sender>&a=<amount>#k=<claim key>.
- * The key lives in the fragment, so only the browser ever sees it.
- * Client component because the fragment is unreadable on the server.
- */
 interface ParsedClaim {
   payment: PaymentLink;
   claimKey: string;
@@ -31,6 +27,12 @@ function toPaymentLink(link: ClaimableLink): PaymentLink {
   };
 }
 
+/**
+ * Real claim links: /t/<id>?from=<sender>&a=<amount>#k=<claim key>.
+ * The key lives in the fragment, so only the browser ever sees it.
+ * A background balance check catches already-claimed links up front — the
+ * reveal shows optimistically and only swaps to the edge state if empty.
+ */
 export default function ClaimPage({
   params,
 }: {
@@ -38,6 +40,7 @@ export default function ClaimPage({
 }) {
   const { id } = use(params);
   const [link, setLink] = useState<ParsedClaim | null | undefined>(undefined);
+  const [emptied, setEmptied] = useState(false);
 
   useEffect(() => {
     // One-shot post-hydration read of the URL fragment (SSR can't see it).
@@ -46,21 +49,33 @@ export default function ClaimPage({
     setLink(
       parsed ? { payment: toPaymentLink(parsed), claimKey: parsed.claimKey } : null
     );
+
+    if (!parsed || !particleEnabled) return;
+    let cancelled = false;
+    // Real links only: confirm the wallet still holds funds.
+    getLinkBalance(parsed.claimKey)
+      .then((bal) => {
+        if (!cancelled && bal <= 0.01) setEmptied(true);
+      })
+      .catch(() => {
+        /* leave the optimistic reveal; claim-time handles a hard failure */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // Fragment not parsed yet (first client tick).
   if (link === undefined) return null;
+  if (link === null) return <ClaimUnavailable reason="invalid" />;
 
-  if (link === null) {
+  if (emptied) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-        <Logo className="h-8" />
-        <p className="mt-6 text-lg font-semibold">This link isn&apos;t valid</p>
-        <p className="mt-2 max-w-[16rem] text-sm text-slate-500">
-          It may have been mistyped or already reclaimed by the sender. Ask
-          them to send a fresh one.
-        </p>
-      </main>
+      <ClaimUnavailable
+        reason="claimed"
+        amountUsd={link.payment.amountUsd}
+        senderName={link.payment.senderName}
+      />
     );
   }
 

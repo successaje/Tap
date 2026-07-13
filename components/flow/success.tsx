@@ -6,6 +6,7 @@ import { Screen } from "@/components/flow/screen";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { getUser, type AppUser } from "@/lib/auth";
+import { markOnboarded } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
 import { formatUsd } from "@/lib/mock";
 
@@ -27,8 +28,12 @@ export function SuccessScreen({
   const [unified, setUnified] = useState<UnifiedBalance | null>(null);
 
   // Post-hydration localStorage read; lazy init would mismatch SSR markup.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setUser(getUser()), []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUser(getUser());
+    // Reaching success IS the "you're in" moment — skip the welcome later.
+    markOnboarded();
+  }, []);
 
   // Live unified balance across chains, once Particle is configured and the
   // user has a real embedded-wallet address.

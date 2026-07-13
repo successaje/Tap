@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Keypad, applyKey } from "@/components/keypad";
+import { PaymentQR } from "@/components/qr";
 import { springs, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
 import { formatUsd } from "@/lib/mock";
@@ -156,9 +157,13 @@ export default function RequestPage() {
                   : "They choose the amount"}
               </p>
 
+              <div className="mt-6">
+                <PaymentQR value={created} caption="Scan to pay you" />
+              </div>
+
               <button
                 onClick={() => share(created)}
-                className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
+                className="mt-5 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
               >
                 <p className="flex-1 truncate font-mono text-sm text-slate-600">
                   {created}

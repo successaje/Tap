@@ -16,6 +16,7 @@ export interface MockUser {
 const USER_KEY = "tap:user";
 const LINKS_KEY = "tap:links";
 const BALANCE_KEY = "tap:balance";
+const ONBOARDED_KEY = "tap:onboarded";
 
 function read<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
@@ -34,6 +35,17 @@ function write(key: string, value: unknown) {
 
 export function getUser(): MockUser | null {
   return read<MockUser>(USER_KEY);
+}
+
+/** First-run flag: gates the "you now have an account" welcome moment. */
+export function isOnboarded(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(ONBOARDED_KEY) === "1";
+}
+
+export function markOnboarded() {
+  if (typeof window !== "undefined")
+    window.localStorage.setItem(ONBOARDED_KEY, "1");
 }
 
 /** Mock Google sign-in: resolves after a short "network" delay. */
