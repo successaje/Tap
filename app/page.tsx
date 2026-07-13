@@ -3,18 +3,24 @@
 import { useEffect, useState } from "react";
 import { Flow } from "@/components/flow/flow";
 import { Home } from "@/components/home";
+import { Landing } from "@/components/landing";
 import { Onboarding } from "@/components/onboarding";
 import { Splash } from "@/components/splash";
 import { getUser, hasPendingResume } from "@/lib/auth";
 import { isOnboarded, markOnboarded, type MockUser } from "@/lib/store";
 import { demoLink } from "@/lib/mock";
 
-type View = "loading" | "home" | "flow" | "onboarding";
+type View = "loading" | "landing" | "demo" | "onboarding" | "home";
 
 /**
- * Root: first-time signed-in users get the welcome moment, returning users
- * land on Home, visitors get the demo claim flow (which doubles as the pitch).
- * A pending OAuth resume always goes to the flow so the claim moment continues.
+ * Root routing:
+ * - not signed in → Landing (a real welcome + sign-in, NOT the mock claim)
+ * - "see how it works" → the demo claim flow, an explicit opt-in
+ * - signed in, first run → Onboarding welcome
+ * - signed in, returning → Home
+ *
+ * Real claim links live at /t/[id], so the demo never masquerades as a real
+ * payment on the front door.
  */
 export default function Root() {
   const [view, setView] = useState<View>("loading");
@@ -25,8 +31,8 @@ export default function Root() {
     /* eslint-disable react-hooks/set-state-in-effect */
     const u = getUser();
     setUser(u);
-    if (hasPendingResume() || !u) {
-      setView("flow");
+    if (!u || hasPendingResume()) {
+      setView(u ? "home" : "landing");
     } else if (!isOnboarded()) {
       setView("onboarding");
     } else {
@@ -37,8 +43,18 @@ export default function Root() {
 
   return (
     <div className="relative flex flex-1 flex-col">
+      {view === "landing" && (
+        <Landing
+          onDemo={() => setView("demo")}
+          onSignedIn={() => {
+            setUser(getUser());
+            window.dispatchEvent(new Event("tap:auth"));
+            setView(isOnboarded() ? "home" : "onboarding");
+          }}
+        />
+      )}
+      {view === "demo" && <Flow initialLink={demoLink} />}
       {view === "home" && <Home />}
-      {view === "flow" && <Flow initialLink={demoLink} />}
       {view === "onboarding" && (
         <Onboarding
           user={user}

@@ -2,18 +2,31 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { Home, QrCode, Landmark } from "lucide-react";
+import { useEffect, useState } from "react";
 import { haptic } from "@/lib/motion";
+import { getUser } from "@/lib/auth";
 
 // Only the top-level tabs show the floating pill — deep flows (send, claim,
-// pay, onboarding) stay chromeless.
+// pay, onboarding) and the signed-out landing stay chromeless.
 const ROOT_PATHS = new Set(["/", "/rewards", "/profile"]);
 
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  // Only for signed-in users — the landing at "/" must stay chromeless.
+  // null until mounted so SSR/first paint renders nothing (no flash, no
+  // hydration mismatch).
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
-  // Derived, not stateful — no effect, no first-paint flash.
-  if (!ROOT_PATHS.has(pathname)) return null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSignedIn(!!getUser());
+    const onAuth = () => setSignedIn(!!getUser());
+    window.addEventListener("tap:auth", onAuth);
+    return () => window.removeEventListener("tap:auth", onAuth);
+  }, [pathname]);
+
+  if (!signedIn || !ROOT_PATHS.has(pathname)) return null;
 
   const navs = [
     { name: "Home", icon: Home, path: "/" },
