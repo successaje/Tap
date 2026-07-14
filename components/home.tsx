@@ -9,7 +9,8 @@ import { getUser, type AppUser } from "@/lib/auth";
 import { getBalance } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
 import { markParticleReachable, syncSentLinkClaims } from "@/lib/links";
-import { getActivity, timeAgo, type ActivityItem } from "@/lib/activity";
+import { isSubscribed, triggerTestPush } from "@/lib/push";
+import { getActivity, pruneDemoArtifacts, timeAgo, type ActivityItem } from "@/lib/activity";
 import { formatUsd } from "@/lib/mock";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings, updateSettings } from "@/lib/settings";
@@ -42,6 +43,7 @@ export function Home() {
     const u = getUser();
     setUser(u);
     setMockBalance(getBalance());
+    pruneDemoArtifacts(); // one-time: drop the demo's fake "Maya" entries
     setActivity(getActivity());
     setSettings(getSettings());
     getExchangeRates().then(setRates);
@@ -69,13 +71,17 @@ export function Home() {
       if (cancelled || claimed.length === 0) return;
       setActivity(getActivity());
       const total = claimed.reduce((s, l) => s + l.amountUsd, 0);
-      setToast(
+      const message =
         claimed.length === 1
           ? `Your ${formatUsd(claimed[0].amountUsd)} link was claimed 🎉`
-          : `${claimed.length} links (${formatUsd(total)}) were claimed 🎉`
-      );
+          : `${claimed.length} links (${formatUsd(total)}) were claimed 🎉`;
+      setToast(message);
       haptic([0, 25, 30, 40]);
       window.setTimeout(() => setToast(null), 5000);
+      // Also land it in the notification tray for subscribed users.
+      isSubscribed().then((on) => {
+        if (on) triggerTestPush("Money claimed", message, "/");
+      });
     });
 
     return () => {

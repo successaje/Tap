@@ -1,6 +1,6 @@
 // Bump to invalidate every previously cached asset on the next visit —
 // activate() below purges old caches and claims all clients immediately.
-const CACHE = "tap-v2";
+const CACHE = "tap-v3";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -72,7 +72,7 @@ self.addEventListener("push", (event) => {
     };
 
     event.waitUntil(self.registration.showNotification(title, options));
-  } catch (err) {
+  } catch {
     // Fallback if payload isn't JSON
     event.waitUntil(
       self.registration.showNotification("tap", {
