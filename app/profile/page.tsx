@@ -9,8 +9,9 @@ import { getSentLinks, reclaimFundedLink, type SentLinkRecord } from "@/lib/link
 import { recordActivity, timeAgo } from "@/lib/activity";
 import { formatCurrency, getExchangeRates, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { getSettings, updateSettings, type Settings as UserSettings } from "@/lib/settings";
+import { subscribeToPush, isSubscribed, triggerTestPush } from "@/lib/push";
 import { ReceiveSheet } from "@/components/receive-sheet";
-import { ChevronDown, Coins, Terminal, ArrowLeft, QrCode, ShieldCheck } from "lucide-react";
+import { ChevronDown, Coins, Terminal, ArrowLeft, QrCode, ShieldCheck, Bell, BellRing } from "lucide-react";
 
 const shorten = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -24,13 +25,15 @@ export default function ProfilePage() {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [rates, setRates] = useState<Record<string, number>>({});
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
 
-   
   useEffect(() => {
     setUser(getUser());
     setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed));
     setSettings(getSettings());
     getExchangeRates().then(setRates);
+    isSubscribed().then(setPushEnabled);
     const handleSettings = () => setSettings(getSettings());
     window.addEventListener("tap:settings", handleSettings);
     return () => window.removeEventListener("tap:settings", handleSettings);
@@ -199,6 +202,49 @@ export default function ProfilePage() {
               />
               <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-accent peer-checked:after:translate-x-full peer-checked:after:border-white" />
             </label>
+          </div>
+
+          <div className="h-px w-full bg-slate-50" />
+
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 items-center justify-center rounded-full bg-slate-50 text-slate-500">
+                {pushEnabled ? <BellRing size={16} strokeWidth={2} /> : <Bell size={16} strokeWidth={2} />}
+              </div>
+              <div>
+                <span className="block text-sm font-semibold text-slate-700">Push Notifications</span>
+                <span className="block text-xs font-medium text-slate-400">
+                  {pushEnabled ? "Enabled on this device" : "Tap to enable"}
+                </span>
+              </div>
+            </div>
+            
+            {pushEnabled ? (
+              <button
+                onClick={async () => {
+                  if (testingPush) return;
+                  setTestingPush(true);
+                  haptic(10);
+                  await triggerTestPush("Test Notification", "Looks like push notifications are working perfectly! 🎉", "/profile");
+                  setTestingPush(false);
+                }}
+                disabled={testingPush}
+                className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 transition-transform active:scale-95 disabled:opacity-70"
+              >
+                {testingPush ? "Sending..." : "Test"}
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  haptic(10);
+                  const subbed = await subscribeToPush();
+                  setPushEnabled(subbed);
+                }}
+                className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-transform active:scale-95 shadow-md shadow-accent/20"
+              >
+                Enable
+              </button>
+            )}
           </div>
         </div>
 

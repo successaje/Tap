@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RippleMark } from "@/components/logo";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { markOnboarded, type MockUser } from "@/lib/store";
+import { subscribeToPush, triggerTestPush } from "@/lib/push";
 
 const points = [
   {
@@ -37,9 +38,25 @@ export function Onboarding({
   onDone: () => void;
 }) {
   const [leaving, setLeaving] = useState(false);
+  const [requestingPush, setRequestingPush] = useState(false);
 
-  function finish() {
+  async function finish() {
+    if (requestingPush) return;
     haptic(15);
+    
+    // Request push permissions on finish if possible
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      setRequestingPush(true);
+      const subscribed = await subscribeToPush();
+      if (subscribed) {
+        await triggerTestPush(
+          "Welcome to tap",
+          "Your universal account is ready. Send money with a link anywhere.",
+          "/"
+        );
+      }
+    }
+
     markOnboarded();
     setLeaving(true);
     setTimeout(onDone, 260);
@@ -98,9 +115,10 @@ export function Onboarding({
             animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.4 } }}
             whileTap={{ scale: 0.97 }}
             onClick={finish}
-            className="mt-8 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
+            disabled={requestingPush}
+            className="mt-8 flex h-14 w-full items-center justify-center rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-70"
           >
-            Start using tap
+            {requestingPush ? "Setting up..." : "Start using tap"}
           </motion.button>
         </motion.main>
       )}
