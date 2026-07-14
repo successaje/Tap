@@ -160,7 +160,7 @@ export function Home() {
           <div className="h-[64px] w-48 rounded-2xl bg-slate-100 animate-pulse" />
         ) : (
           <motion.div variants={rise} className="flex items-center gap-3">
-            <p className="text-[64px] font-semibold leading-none tracking-tighter tabular-nums text-slate-900">
+            <p className="text-[48px] sm:text-[64px] font-semibold leading-none tracking-tighter tabular-nums text-slate-900 break-words max-w-[280px] sm:max-w-none">
               {settings.hideBalance ? "••••••" : formatCurrency(balance, settings.currency, rates)}
             </p>
             <button 
@@ -264,7 +264,13 @@ export function Home() {
                         )}
                       </span>
                     </span>
-                    <span className="text-sm font-semibold tabular-nums text-slate-900">
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${
+                        a.type === "received" || a.type === "reclaimed"
+                          ? "text-emerald-600"
+                          : "text-slate-900"
+                      }`}
+                    >
                       {meta.sign}
                       {settings.hideBalance ? "••••" : formatCurrency(a.amountUsd, settings.currency, rates)}
                     </span>

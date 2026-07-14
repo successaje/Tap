@@ -66,6 +66,25 @@ export function updateActivityByLinkId(
   window.localStorage.setItem(KEY, JSON.stringify(list));
 }
 
+/**
+ * One-time cleanup: earlier builds let the "see how claiming works" demo write
+ * its fake $42.50-from-Maya into real history. Remove anything matching that
+ * exact demo signature (no on-chain receipt, demo sender, demo amount).
+ */
+export function pruneDemoArtifacts() {
+  if (typeof window === "undefined") return;
+  const cleaned = getActivity().filter(
+    (a) =>
+      !(
+        a.type === "received" &&
+        a.counterparty === "Maya" &&
+        !a.txId &&
+        Math.abs(a.amountUsd - 42.5) < 0.001
+      )
+  );
+  window.localStorage.setItem(KEY, JSON.stringify(cleaned));
+}
+
 /** Relative "2m ago" style timestamp for the feed. */
 export function timeAgo(iso: string): string {
   const s = Math.max(1, Math.floor((Date.now() - Date.parse(iso)) / 1000));

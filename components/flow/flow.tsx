@@ -12,7 +12,7 @@ import { addToBalance, getBalance } from "@/lib/store";
 import { authEnabled, consumeReturnStep, getUser } from "@/lib/auth";
 import { claimFundedLink } from "@/lib/links";
 import { recordActivity } from "@/lib/activity";
-import type { TransferReceipt } from "@/lib/particle";
+import { particleEnabled, type TransferReceipt } from "@/lib/particle";
 import type { PaymentLink } from "@/lib/mock";
 
 type Step = "claim" | "login" | "moment" | "success" | "send";
@@ -104,15 +104,21 @@ export function Flow({
                 addToBalance(link.amountUsd);
                 setBalance(getBalance());
               }
-              recordActivity({
-                type: "received",
-                amountUsd: r?.sentUsd ?? link.amountUsd,
-                counterparty: link.senderName,
-                note: link.note,
-                status: "settled",
-                explorerUrl: r?.explorerUrl,
-                txId: r?.transactionId,
-              });
+              // Only real claims write history. The "see how it works" demo
+              // must never pollute the ledger once real rails are live —
+              // in pure-mock environments (no Particle keys) it still records
+              // so the app feels alive.
+              if (r || !particleEnabled) {
+                recordActivity({
+                  type: "received",
+                  amountUsd: r?.sentUsd ?? link.amountUsd,
+                  counterparty: link.senderName,
+                  note: link.note,
+                  status: "settled",
+                  explorerUrl: r?.explorerUrl,
+                  txId: r?.transactionId,
+                });
+              }
               setStep("success");
             }}
           />

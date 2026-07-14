@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Screen } from "@/components/flow/screen";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
@@ -22,6 +23,7 @@ export function SuccessScreen({
   explorerUrl?: string;
   onSend: () => void;
 }) {
+  const router = useRouter();
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [dismissed, setDismissed] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
@@ -202,19 +204,32 @@ export function SuccessScreen({
         </AnimatePresence>
       </motion.div>
 
-      <motion.button
+      <motion.div
         initial={{ opacity: 0, y: 28 }}
         animate={{
           opacity: 1,
           y: 0,
           transition: { ...springs.snappy, delay: 0.35 },
         }}
-        whileTap={{ scale: 0.96 }}
-        onClick={onSend}
-        className="mt-4 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
+        className="mt-4 space-y-2"
       >
-        Send money back
-      </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={onSend}
+          className="h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
+        >
+          Send money back
+        </motion.button>
+        <button
+          onClick={() => {
+            haptic(10);
+            router.push("/");
+          }}
+          className="h-12 w-full rounded-full text-base font-semibold text-slate-500"
+        >
+          Go to my balance
+        </button>
+      </motion.div>
     </Screen>
   );
 }
