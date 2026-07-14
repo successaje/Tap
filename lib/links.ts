@@ -9,14 +9,34 @@
 // from the swept funds themselves — the recipient needs no gas, ever.
 
 import { getUser } from "@/lib/store";
-import { signWithMagic } from "@/lib/magic";
+import { magicUaSigner } from "@/lib/magic";
 import {
   particleEnabled,
   transferOnArbitrum,
   sweepAllToAddress,
   getUnifiedBalance,
   type TransferReceipt,
+  type UaSigner,
 } from "@/lib/particle";
+
+/** UA signer backed by a raw ethers Wallet (the link's throwaway key). */
+async function walletUaSigner(privateKey: string): Promise<{
+  address: string;
+  signer: UaSigner;
+}> {
+  const { Wallet, Signature } = await import("ethers");
+  const wallet = new Wallet(privateKey);
+  return {
+    address: wallet.address,
+    signer: {
+      signMessage: (message) => wallet.signMessage(message),
+      signAuthorization: async ({ address, chainId, nonce }) => {
+        const auth = await wallet.authorize({ address, chainId, nonce });
+        return Signature.from(auth.signature).serialized;
+      },
+    },
+  };
+}
 
 export interface FundedLink {
   id: string;
@@ -67,7 +87,7 @@ export async function createFundedLink(
     user.address,
     ephemeral.address,
     amountUsd,
-    signWithMagic
+    magicUaSigner()
   );
 
   const id = ephemeral.address.slice(2, 10).toLowerCase();
@@ -149,11 +169,8 @@ export async function claimFundedLink(
   const user = getUser();
   if (!user?.address) throw new Error("Sign in before claiming");
 
-  const { Wallet } = await import("ethers");
-  const wallet = new Wallet(claimKey);
-  return sweepAllToAddress(wallet.address, user.address, (message) =>
-    wallet.signMessage(message)
-  );
+  const { address, signer } = await walletUaSigner(claimKey);
+  return sweepAllToAddress(address, user.address, signer);
 }
 
 export interface SentLinkRecord extends FundedLink {

@@ -42,3 +42,38 @@ export async function signWithMagic(message: Uint8Array): Promise<string> {
   const signer = await provider.getSigner();
   return signer.signMessage(message);
 }
+
+/**
+ * Full Universal Account signer backed by Magic: personal-signs rootHashes and
+ * signs EIP-7702 delegation authorizations via magic.wallet.sign7702Authorization
+ * (magic-sdk ≥ 33.4; headless, no popup). We pass Particle's explicit nonce so
+ * the delegation matches the prepared userOp exactly.
+ */
+export function magicUaSigner(): import("@/lib/particle").UaSigner {
+  return {
+    signMessage: signWithMagic,
+    signAuthorization: async ({ address, chainId, nonce }) => {
+      const magic = await getMagic();
+      if (!magic) throw new Error("Magic is not configured");
+      const wallet = magic.wallet as unknown as {
+        sign7702Authorization: (params: {
+          contractAddress: string;
+          chainId: number;
+          nonce?: number;
+        }) => Promise<{ r: string; s: string; v: number }>;
+      };
+      if (typeof wallet.sign7702Authorization !== "function") {
+        throw new Error(
+          "This version of Magic can't authorize EIP-7702 accounts"
+        );
+      }
+      const auth = await wallet.sign7702Authorization({
+        contractAddress: address,
+        chainId,
+        nonce,
+      });
+      const { Signature } = await import("ethers");
+      return Signature.from({ r: auth.r, s: auth.s, v: auth.v }).serialized;
+    },
+  };
+}

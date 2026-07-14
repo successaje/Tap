@@ -89,6 +89,57 @@ export interface TransferReceipt {
   feeUsd: number;
 }
 
+/**
+ * Everything a Universal Account transaction may need signed by the owner EOA:
+ * the rootHash (personal sign) and — on the first transaction per chain — an
+ * EIP-7702 delegation authorization (raw tuple signature). Magic exposes
+ * sign7702Authorization for the latter; ethers Wallets use authorize().
+ */
+export interface UaSigner {
+  signMessage: (message: Uint8Array) => Promise<string>;
+  /** Returns the SERIALIZED (r,s,v) signature for the authorization tuple. */
+  signAuthorization: (auth: {
+    address: string;
+    chainId: number;
+    nonce: number;
+  }) => Promise<string>;
+}
+
+interface AuthUserOp {
+  userOpHash: string;
+  eip7702Auth?: { address: string; chainId: number; nonce: number };
+  eip7702Delegated?: boolean;
+}
+
+/**
+ * First transaction per chain from a 7702 account must include a signed
+ * delegation authorization per userOp that asks for one. Mirrors Particle's
+ * official demo: sign each unique (chainId, nonce) tuple once, then attach it
+ * to every userOp that needs it.
+ */
+async function buildAuthorizations(
+  userOps: AuthUserOp[],
+  signer: UaSigner
+): Promise<Array<{ userOpHash: string; signature: string }>> {
+  const out: Array<{ userOpHash: string; signature: string }> = [];
+  const cache = new Map<string, string>();
+  for (const op of userOps) {
+    if (!op.eip7702Auth || op.eip7702Delegated) continue;
+    const key = `${op.eip7702Auth.chainId}:${op.eip7702Auth.nonce}`;
+    let sig = cache.get(key);
+    if (!sig) {
+      sig = await signer.signAuthorization({
+        address: op.eip7702Auth.address,
+        chainId: Number(op.eip7702Auth.chainId),
+        nonce: Number(op.eip7702Auth.nonce),
+      });
+      cache.set(key, sig);
+    }
+    out.push({ userOpHash: op.userOpHash, signature: sig });
+  }
+  return out;
+}
+
 /** Native USDC on Arbitrum One. */
 const USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 
@@ -107,8 +158,38 @@ async function createUsdcTransfer(
   });
 }
 
+/**
+ * Particle returns USD fee amounts as hex strings scaled by 1e18
+ * (e.g. "0x65fdc6a2cbe680" ≈ $0.0287). Parse defensively: hex → 18-dec,
+ * plain decimal strings pass through.
+ */
+function parseUsd18(v: string | undefined | null): number {
+  if (!v) return 0;
+  if (v.startsWith("0x")) {
+    try {
+      return Number(BigInt(v)) / 1e18;
+    } catch {
+      return 0;
+    }
+  }
+  return Number(v) || 0;
+}
+
 function quotedFeeUsd(tx: { feeQuotes?: Array<{ fees?: { totals?: { feeTokenAmountInUSD?: string } } }> }): number {
-  return Number(tx.feeQuotes?.[0]?.fees?.totals?.feeTokenAmountInUSD ?? 0);
+  return parseUsd18(tx.feeQuotes?.[0]?.fees?.totals?.feeTokenAmountInUSD);
+}
+
+/** Wrap a stage so failures self-describe where they happened. */
+async function stage<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const detail =
+      err instanceof Error ? err.message : typeof err === "string" ? err : "unknown error";
+    const data = (err as { data?: unknown })?.data;
+    console.error(`[tap] ${name} failed:`, err, data ? { data } : "");
+    throw new Error(`${name}: ${detail}`);
+  }
 }
 
 /**
@@ -120,15 +201,24 @@ export async function transferOnArbitrum(
   ownerAddress: string,
   receiver: string,
   amountUsd: number,
-  signMessage: (message: Uint8Array) => Promise<string>
+  signer: UaSigner
 ): Promise<TransferReceipt> {
   const ua = await getUniversalAccount(ownerAddress);
   if (!ua) throw new Error("Particle is not configured");
   const { getBytes } = await import("ethers");
 
-  const tx = await createUsdcTransfer(ua, receiver, amountUsd);
-  const signature = await signMessage(getBytes(tx.rootHash));
-  const result = await ua.sendTransaction(tx, signature);
+  const tx = await stage("Preparing the transfer", () =>
+    createUsdcTransfer(ua, receiver, amountUsd)
+  );
+  const authorizations = await stage("Authorizing your account (7702)", () =>
+    buildAuthorizations(tx.userOps as unknown as AuthUserOp[], signer)
+  );
+  const signature = await stage("Signing with your account", () =>
+    signer.signMessage(getBytes(tx.rootHash))
+  );
+  const result = await stage("Submitting on-chain", () =>
+    ua.sendTransaction(tx, signature, authorizations)
+  );
   return {
     transactionId: result.transactionId,
     explorerUrl: `https://universalx.app/activity/details?id=${result.transactionId}`,
@@ -146,7 +236,7 @@ export async function transferOnArbitrum(
 export async function sweepAllToAddress(
   ownerAddress: string,
   receiver: string,
-  signMessage: (message: Uint8Array) => Promise<string>
+  signer: UaSigner
 ): Promise<TransferReceipt> {
   const ua = await getUniversalAccount(ownerAddress);
   if (!ua) throw new Error("Particle is not configured");
@@ -176,9 +266,16 @@ export async function sweepAllToAddress(
   let lastErr: unknown = null;
   for (const amount of candidates) {
     try {
-      const tx = await createUsdcTransfer(ua, receiver, amount);
-      const signature = await signMessage(getBytes(tx.rootHash));
-      const result = await ua.sendTransaction(tx, signature);
+      const tx = await stage("Preparing the claim", () =>
+        createUsdcTransfer(ua, receiver, amount)
+      );
+      const authorizations = await stage("Authorizing the link (7702)", () =>
+        buildAuthorizations(tx.userOps as unknown as AuthUserOp[], signer)
+      );
+      const signature = await signer.signMessage(getBytes(tx.rootHash));
+      const result = await stage("Submitting on-chain", () =>
+        ua.sendTransaction(tx, signature, authorizations)
+      );
       return {
         transactionId: result.transactionId,
         explorerUrl: `https://universalx.app/activity/details?id=${result.transactionId}`,

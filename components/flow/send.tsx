@@ -75,7 +75,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
     if (!real) {
       console.log("[tap:send] Taking MOCK path");
       const mock = createLink(numericUsd, note.trim());
-      setShareUrl(`https://tap.cash/t/${mock.id}`);
+      setShareUrl(`${window.location.origin}/t/${mock.id}`);
       recordActivity({
         type: "sent",
         amountUsd: numericUsd,

@@ -7,7 +7,7 @@ import { Keypad, applyKey } from "@/components/keypad";
 import { RippleMark } from "@/components/logo";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, beginGoogleLogin, authEnabled, type AppUser } from "@/lib/auth";
-import { signWithMagic } from "@/lib/magic";
+import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
@@ -78,7 +78,7 @@ export default function PayPage() {
           user.address,
           req.to,
           numericUsd,
-          signWithMagic
+          magicUaSigner()
         );
         url = receipt.explorerUrl;
       } else {
