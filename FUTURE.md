@@ -1,140 +1,123 @@
-# What's next for tap
+# Roadmap
 
-This is the honest "if we kept building" document — not hackathon padding.
-Two kinds of work live here: **infrastructure tap already needs** (a backend,
-eventually), and **application-layer concepts** on the same core stack
-(identity-minted Universal Account, EIP-7702, Arbitrum settlement) that would
-give tap a product surface distinct from Peanut Protocol, rather than
-competing head-on in the same category. See the README's *"Isn't this just
-Peanut?"* section for why that distinction matters.
+This document covers two categories of future work: the backend
+infrastructure required to close known gaps in the current build, and
+application-layer directions on the same account architecture that extend
+tap beyond its current product category.
 
 ---
 
-## Part 1 — Infrastructure: closing the backend gap
+## Part 1 — Backend infrastructure
 
-tap currently has **no backend and no database** (see the README's
-*Architecture* section for the full breakdown of what that does and doesn't
-cost us). In priority order, here's what a real backend would unlock:
+tap currently has no backend and no database, as described in the README's
+*Backend and data* section. In priority order, this is what a minimal
+backend would add.
 
-### 1. Push notifications that fire when the app is closed
-**The highest-leverage addition.** Today, "your link was claimed" only fires
-if the sender's own tab is open and happens to poll the chain. The
-infrastructure to *deliver* the push already exists (`lib/push.ts`,
-`/api/push`, VAPID keys, service-worker handlers) — what's missing is
-something watching the chain on the user's behalf.
+### 1. Background push notifications
+The current implementation delivers a push notification only when a sender's
+own browser tab is open and polling detects a claim. The delivery
+infrastructure already exists (`lib/push.ts`, `/api/push`, VAPID keys,
+service-worker handlers); what is missing is a process watching the chain on
+the user's behalf, independent of any open tab.
 
-**Shape of the fix:**
-- A small key-value store (Vercel KV or Upstash Redis — both have
-  near-zero-setup free tiers) holding `{ userId, pushSubscription,
-  outstandingLinkAddresses[] }`.
-- A Vercel Cron job (every 1–2 minutes) that iterates outstanding links,
-  calls `getUnifiedBalance()` on each (the exact check `syncSentLinkClaims()`
-  already does client-side, in `lib/links.ts`), and calls `webpush.send()`
-  directly for any that emptied since the last run.
-- No new user-facing surface — this is invisible plumbing that makes the
-  existing "🎉 claimed" moment work even when you're not looking at your
-  phone.
+Proposed implementation:
+- A key-value store (Vercel KV or Upstash Redis) holding
+  `{ userId, pushSubscription, outstandingLinkAddresses[] }`.
+- A scheduled job (Vercel Cron, every one to two minutes) that checks each
+  outstanding link's balance using the same logic `syncSentLinkClaims()`
+  already runs client-side (`lib/links.ts`), and sends a push directly for
+  any link that emptied since the previous run.
+- No new user-facing surface. This closes an existing feature rather than
+  introducing one.
 
-### 2. Activity history that follows identity, not device
-Right now, signing in on a new phone shows the correct on-chain balance
-(the chain is the source of truth for that) but an **empty activity feed**
-(it's `localStorage`, per-device). Fix: move `lib/activity.ts`'s writes to a
-`POST /api/activity` backed by the same KV/DB, keyed by the user's Magic
-`email` or EOA address, with `localStorage` staying as an optimistic local
-cache. Low risk, mechanical change — the read/write shape barely changes.
+### 2. Cross-device activity history
+Signing in on a new device currently shows the correct balance, read live
+from the chain, but an empty activity feed, since history is stored in
+`localStorage`. Moving activity writes to a small API backed by the same
+data store, keyed by the user's Magic email or EOA address, resolves this
+with `localStorage` retained as a local cache. The read/write shape in
+`lib/activity.ts` requires minimal change.
 
 ### 3. Referral attribution
-As covered in the README, this is fundamentally undoable client-only — a
-referrer's device cannot observe what happens on a referee's device. Real
-version: `?ref=` param → write a pending referral row keyed by referral code
-→ when the referee's *first funded send* succeeds, a server-side webhook (or
-the same cron sweep) flips it to `activated` and credits the referrer. This
-was explicitly cut from the hackathon build rather than faked — see the
-git history for the removed `lib/referrals.ts`.
+Referral tracking requires a server because a referring device cannot
+observe activity on a referred device. A minimal version: a `?ref=`
+parameter writes a pending referral record keyed by referral code; when the
+referred account completes its first funded send, a webhook or the same
+scheduled job marks the referral activated and credits the referrer. An
+earlier version of this feature was removed from the codebase rather than
+shipped with fabricated data — see `lib/referrals.ts` in git history.
 
-### 4. Global metrics
-"$X moved through tap today," "N links claimed" — a nice-to-have marketing
-surface, but only meaningful once (1) and (2) exist, since it's just an
-aggregate query over the same activity store.
+### 4. Aggregate metrics
+Product-level statistics ("total volume moved," "links claimed") become
+meaningful once activity history is centralized (item 2), since they are an
+aggregate query over the same store rather than a separate system.
 
-None of this is a redesign — it's the same architecture with a thin,
-serverless data layer added underneath. Each item is independently shippable
-in isolation.
+Each item above is independently shippable and does not require changes to
+the account architecture already in production.
 
 ---
 
-## Part 2 — Application-layer concepts on the same stack
+## Part 2 — Application-layer directions
 
-The core primitive tap has built is genuinely reusable: **an identity login
-mints a Universal Account; a link (or a request) is a claim ticket against
-value moved through that account; Arbitrum settles it invisibly.** Below are
-three different products built on exactly that primitive, each aimed at a
-different buyer than Peanut's human-to-human remittance framing.
+The account architecture underlying tap — identity mints a Universal
+Account, a link is a claim ticket against value moved through that account,
+Arbitrum settles it — is reusable beyond peer-to-peer transfer. The three
+directions below apply the same architecture to different products.
 
-### Option A — Split: group expense settlement
-Instead of tap's current one-to-one "here's a link," the primitive becomes a
-**shared bill**. One person creates an event (dinner, trip, rent), it
-generates individual claim links per participant, each pays their share from
-whatever they hold, and it all settles to one place with running balance
-state.
+### A. Group expense settlement
+Replace the single sender-to-recipient link with a shared bill: one person
+creates an event, individual claim links are generated per participant, each
+participant pays their share independently, and the event settles to one
+place with running balance state.
 
-**Why it's structurally different from Peanut, not a reskin:** Peanut's
-atomic unit is a single deposit-and-claim. This is a many-to-one settlement
-event with state — closer to Splitwise's category than Peanut's. Also the
-strongest **adoption** story (20% of score) of the three options, since group
-expense-splitting is a universal, already-existing habit, not a
-crypto-native behavior you're hoping to create.
+This differs structurally from a single-link transfer rather than
+restyling it — the underlying primitive becomes a many-to-one settlement
+event rather than a single deposit and claim. It also has the broadest
+existing user base of the three directions, since group expense-splitting
+is an established behavior independent of crypto adoption.
 
-**Rough build steps, reusing what exists:**
-1. New data shape: `SplitEvent { id, title, totalUsd, participants[] }`,
-   each participant gets a `share` and their own claim-link-style throwaway
-   key (identical mechanic to today's `lib/links.ts`).
-2. Creation UI: reuse `Keypad` + a participant list instead of a single
-   recipient.
-3. Claim UI: reuse `ClaimMoment`/`ClaimUnavailable` almost verbatim — "You
-   owe $12 for dinner" instead of "Maya sent you $42.50."
-4. Settlement: each participant's payment is a normal `transferOnArbitrum()`
-   call to the event creator's address — no new on-chain mechanism needed.
-5. Needs Part 1.2 (server-side activity) to show a live "3 of 5 paid" state
-   across every participant's device.
+Implementation outline:
+1. A `SplitEvent { id, title, totalUsd, participants[] }` record, where each
+   participant receives a throwaway claim key using the same mechanism as
+   `lib/links.ts`.
+2. Creation UI reuses the existing keypad and amount components with a
+   participant list in place of a single recipient.
+3. Claim UI reuses `ClaimMoment` and `ClaimUnavailable` with adjusted copy.
+4. Settlement is a standard `transferOnArbitrum()` call per participant to
+   the event creator's address; no new on-chain mechanism is required.
+5. A live "N of M paid" state across participants' devices requires the
+   cross-device activity sync described in Part 1, item 2.
 
-### Option B — Durable receive-requests ("tap-to-pay-me")
-Flip the direction: instead of a sender pushing a one-shot link, a receiver
-posts a **permanent** request — a market stall, tip jar, or small creator
-prints one QR/NFC sticker once, and it becomes a standing "pay me" surface
-anyone can tap, indefinitely.
+### B. Durable receive requests
+Invert the direction of the existing request flow: instead of a one-time
+link created per transaction, a recipient publishes a permanent request — a
+printed QR or NFC code for a market stall, tip jar, or independent seller —
+that remains payable indefinitely.
 
-**Why it's different:** Peanut is entirely sender-initiated (create a link,
-push it). This is receiver-initiated and durable, not one-shot — closer to a
-Venmo/Cash App `$cashtag` than a claim link.
+Most of the underlying mechanism already exists: `/request` generates a
+link and QR code via `PaymentQR`, and a signed-in user's personal pay link
+is already durable. The remaining work is presentation: a dedicated
+high-contrast QR screen designed for printing or display, without a fixed
+amount, and repeat-payer recognition on the `/pay` flow. This is the
+smallest of the three directions to implement, composed largely from
+existing components.
 
-**Rough build steps:** tap already has 80% of this — `/request` generates a
-link+QR via `PaymentQR`, and a signed-in user's own pay link (surfaced on
-Home) is *already* durable. The gap is packaging: a dedicated "My tap code"
-screen meant for printing/display (large, high-contrast QR, no amount
-baked in, brandable), plus letting the `/pay` flow remember "who paid me
-before" for repeat tippers. Smallest lift of the three — mostly a new screen
-composed from existing components (`PaymentQR`, `Keypad`), not new payment
-logic.
+### C. Agent-to-agent micropayments
+Arbitrum's bounty documentation cites AI applications with invisible
+on-chain payments as an example direction. In this model, tap is not a
+human-facing application — it is infrastructure an AI agent or backend
+service uses to pay another agent or service for an API call, a tool
+invocation, or a unit of compute, with a claim token replacing the
+human-facing claim link.
 
-### Option C — Agent-to-agent micropayments (most novel, most distinct from Peanut)
-Arbitrum's own bounty brief names *"AI apps with invisible onchain
-payments"* as an example. Here tap isn't a human-facing app at all — it's
-infrastructure an AI agent or backend service calls to pay another
-agent/service for an API call, a tool invocation, or a slice of compute,
-with the "claim link" becoming a programmatic payment token instead of
-something a human taps.
+This direction pairs naturally with [x402](https://github.com/coinbase/x402),
+the emerging HTTP-native "402 Payment Required" standard for exactly this
+pattern: a server responds with HTTP 402 and payment requirements, the
+calling agent pays, and the request is retried with proof of payment
+attached. The underlying account primitives tap already implements —
+Universal Account creation, cross-chain transfer, on-chain receipt
+verification — are the components x402 requires from a payer implementation.
 
-**Why it's the sharpest differentiator:** Peanut is explicitly
-human-to-human P2P. This is agent-to-agent, machine-initiated, and pairs
-naturally with **[x402](https://github.com/coinbase/x402)** — the emerging
-HTTP-native "402 Payment Required" standard for exactly this pattern (a
-server responds `402` with payment requirements in the response headers; the
-caller's agent pays and retries the request with proof of payment). tap's
-stack already has every primitive x402 needs — it's the missing "payer"
-implementation, not a new payment rail.
-
-**Concrete architecture:**
 ```
 Agent A (caller)                    Agent B (service)
      │                                     │
@@ -143,10 +126,9 @@ Agent A (caller)                    Agent B (service)
      │◀─── 402 Payment Required ──────────│  { amount, chain: Arbitrum,
      │       + payment requirements       │    receiver, asset: USDC }
      │                                     │
-     │  [tap-agent-sdk pays via the       │
-     │   caller's Universal Account —     │
-     │   same transferOnArbitrum() the    │
-     │   app already uses]                │
+     │  tap-agent-sdk pays via the        │
+     │  caller's Universal Account,       │
+     │  reusing transferOnArbitrum()      │
      │                                     │
      │──── GET /api/resource ────────────▶│
      │      + X-PAYMENT: <tx proof>       │
@@ -155,47 +137,50 @@ Agent A (caller)                    Agent B (service)
      │                                     │   receipt before releasing)
 ```
 
-**Rough build steps:**
-1. **Agent identity**: each agent needs a Universal Account without an
-   interactive Google login on every call. Two viable paths: (a) a human
-   owner signs in once via the existing Magic flow and issues a scoped,
-   long-lived credential for their agent to hold server-side, or (b) Magic's
-   server-side/delegated auth (check current docs at build time — this
-   space moves fast, same rule as the rest of this project). Either way,
-   the *Particle Universal Account* layer (`lib/particle.ts`) is already
-   identity-agnostic — it just needs an EOA and a signer, which either path
-   provides.
-2. **`tap-agent-sdk`**: a thin wrapper exposing `pay(requirements)` and
+Implementation outline:
+1. **Agent identity.** Each agent requires a Universal Account without an
+   interactive Google login on every call. Two approaches: a human owner
+   authenticates once via the existing Magic flow and issues a scoped,
+   long-lived credential for server-side use by their agent, or Magic's
+   server-side authentication is used directly (current documentation
+   should be consulted at implementation time, as this surface evolves
+   quickly). The Particle Universal Account layer in `lib/particle.ts` is
+   already identity-agnostic — it requires only an EOA and a signer, which
+   either approach provides.
+2. **`tap-agent-sdk`.** A thin wrapper exposing `pay(requirements)` and
    `verifyPayment(txProof)`, built directly on the existing
-   `transferOnArbitrum()` / `getUniversalAccount()` functions in
-   `lib/particle.ts` — this is largely repackaging, not new logic.
-3. **x402 middleware**: a small Express/Next middleware for the *receiving*
-   agent that emits the `402` + requirements and validates the `X-PAYMENT`
-   proof against Particle's transaction API before releasing the resource.
-4. **No human UI required for the core loop** — the "product" becomes a
-   dashboard for the human owner to set spend limits, watch their agent's
-   transaction log, and fund/cash-out its Universal Account, reusing tap's
-   existing Home/Activity/Cash-out screens almost as-is.
+   `transferOnArbitrum()` and `getUniversalAccount()` functions — largely
+   a packaging exercise rather than new payment logic.
+3. **x402 middleware.** A small server-side middleware for the receiving
+   agent that issues the 402 response with payment requirements and
+   validates the `X-PAYMENT` proof against Particle's transaction API
+   before releasing the resource.
+4. **Human interface.** The core payment loop requires no human-facing UI.
+   A monitoring surface for the account owner — spend limits, transaction
+   log, funding and cash-out — can reuse tap's existing Home, Activity, and
+   Cash-out screens with minimal modification.
 
-**Honest risk assessment:** highest execution risk of the three (x402 is
-young, agent-identity delegation needs real research against current Magic
-docs, and there's no human tapping a ripple animation to score on the 40%
-UX weighting) — but it's the one furthest from "isn't this just Peanut,"
-and it's the direction most aligned with where agent-native payments are
-heading industry-wide.
+This direction carries the highest execution risk of the three: x402 is an
+early-stage standard, agent identity delegation requires implementation
+research against current provider documentation, and the core interaction
+has no human-facing moment to evaluate against the hackathon's UX criterion.
+It is also the direction with the least overlap with existing link-payment
+products, and the closest alignment with where agent-native payment
+infrastructure is heading.
 
----
+### Relative priority
 
-## My honest ranking, if choosing one to build next
+Ordered by implementation cost and time to ship, independent of long-term
+strategic value:
 
-1. **Option B (durable receive-requests)** — smallest lift, ships in days
-   not weeks, and is purely additive to what exists today.
-2. **Option A (Split)** — best balance of distinctiveness and demoability,
-   but a real second build effort (new data model, new claim copy, needs
-   Part 1.2 for the live "who's paid" state to feel real across devices).
-3. **Option C (Agent payments)** — most interesting, most defensible against
-   the Peanut comparison, but the one to attempt only with real runway and
-   a clear owner for the x402/agent-identity research — not a "quick add."
+1. **Durable receive requests** — smallest scope, composed mostly from
+   existing components, ships independently of any backend work.
+2. **Group expense settlement** — a genuine second product surface with a
+   new data model, most valuable once cross-device activity sync (Part 1)
+   is in place.
+3. **Agent-to-agent micropayments** — highest ceiling and the direction
+   with the most distinct market position, but requires dedicated research
+   time on agent identity and x402 before implementation begins.
 
-None of these require touching the core architecture that's already proven
-end-to-end with real money. That part stays exactly as it is.
+None of these directions require modification to the core payment
+architecture currently in production.
