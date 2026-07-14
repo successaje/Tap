@@ -12,7 +12,7 @@ seed phrase, no gas, no visible chain. It feels like sending a text.
 
 Built for the **UXmaxx Hackathon** (Encode × Particle Network).
 
-> **Live demo:** _<add your Vercel URL here after deploy>_
+> **Live demo:** [tap-xyz.vercel.app](https://tap-xyz.vercel.app/)
 > **Walkthrough:** open the link on your phone → tap to claim → sign in with Google → watch it land.
 
 ## The core experience
