@@ -176,6 +176,8 @@ export async function claimFundedLink(
 export interface SentLinkRecord extends FundedLink {
   privateKey: string;
   reclaimed?: boolean;
+  /** Set once we observe the link's wallet emptied by a recipient. */
+  claimed?: boolean;
 }
 
 /** Sender-side records of real links created on this device. */
@@ -186,6 +188,42 @@ export function getSentLinks(): SentLinkRecord[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The chain is the source of truth for "was my link claimed?" — there's no
+ * backend, so we poll each outstanding link's wallet. Empty wallet ⇒ someone
+ * swept it. Marks records + activity rows and returns the newly claimed links
+ * so the caller can celebrate.
+ */
+export async function syncSentLinkClaims(): Promise<SentLinkRecord[]> {
+  if (!particleEnabled) return [];
+  const { updateActivityByLinkId } = await import("@/lib/activity");
+  const outstanding = getSentLinks().filter((l) => !l.reclaimed && !l.claimed);
+  const newlyClaimed: SentLinkRecord[] = [];
+
+  for (const link of outstanding) {
+    try {
+      const balance = await getUnifiedBalance(link.address);
+      if (balance !== null && balance.totalUsd <= 0.01) {
+        newlyClaimed.push(link);
+        updateActivityByLinkId(link.id, { status: "settled" });
+      }
+    } catch {
+      /* transient — try again next visit */
+    }
+  }
+
+  if (newlyClaimed.length > 0) {
+    const ids = new Set(newlyClaimed.map((l) => l.id));
+    window.localStorage.setItem(
+      SENT_KEY,
+      JSON.stringify(
+        getSentLinks().map((l) => (ids.has(l.id) ? { ...l, claimed: true } : l))
+      )
+    );
+  }
+  return newlyClaimed;
 }
 
 /**

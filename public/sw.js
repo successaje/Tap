@@ -1,4 +1,6 @@
-const CACHE = "tap-v1";
+// Bump to invalidate every previously cached asset on the next visit —
+// activate() below purges old caches and claims all clients immediately.
+const CACHE = "tap-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

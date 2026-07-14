@@ -28,7 +28,7 @@ export default function ProfilePage() {
    
   useEffect(() => {
     setUser(getUser());
-    setLinks(getSentLinks().filter((l) => !l.reclaimed));
+    setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed));
     setSettings(getSettings());
     getExchangeRates().then(setRates);
     const handleSettings = () => setSettings(getSettings());
@@ -51,7 +51,7 @@ export default function ProfilePage() {
         explorerUrl: receipt.explorerUrl,
         txId: receipt.transactionId,
       });
-      setLinks(getSentLinks().filter((l) => !l.reclaimed));
+      setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed));
       haptic([0, 25, 30, 40]);
     } catch (err) {
       setErrors((e) => ({

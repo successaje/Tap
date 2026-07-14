@@ -10,7 +10,7 @@ import { createLink, getUser } from "@/lib/store";
 import { canSendReal, createFundedLink } from "@/lib/links";
 import { getUnifiedBalance } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
-import { formatUsd, formatLocalInput, localToUsd } from "@/lib/mock";
+import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 type Phase = "compose" | "funding" | "created";
 
@@ -182,15 +182,22 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
                 className="mt-4 rounded-full bg-slate-100 px-4 py-2 text-center text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
 
-              <button 
-                onClick={() => {
-                  haptic(10);
-                  setAmount(real && available !== null ? Math.floor(available * 100).toString() : "27500");
-                }}
-                className="mt-4 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-500 active:scale-95 transition-transform"
-              >
-                Use Max
-              </button>
+              {real && available !== null && available > 0.1 && (
+                <button
+                  onClick={() => {
+                    haptic(10);
+                    // Max = balance minus fee headroom (gas comes out of the
+                    // same balance; Arbitrum quotes run ~$0.03–0.05).
+                    const maxUsd = Math.max(0, available - Math.max(0.08, available * 0.02));
+                    const maxLocal = Math.floor(usdToLocal(maxUsd) * 100) / 100;
+                    setError(null);
+                    setAmount(maxLocal.toFixed(2));
+                  }}
+                  className="mt-4 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-500 transition-transform active:scale-95"
+                >
+                  Send max
+                </button>
+              )}
 
               {real && (
                 <button

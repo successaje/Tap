@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { SupportSheet } from "@/components/support-sheet";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
 import { getBalance } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
-import { markParticleReachable } from "@/lib/links";
+import { markParticleReachable, syncSentLinkClaims } from "@/lib/links";
 import { getActivity, timeAgo, type ActivityItem } from "@/lib/activity";
+import { formatUsd } from "@/lib/mock";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings, updateSettings } from "@/lib/settings";
 import { ArrowUpRight, ArrowDownLeft, CornerDownLeft, Eye, EyeOff, Trophy, MessageSquare, Receipt } from "lucide-react";
@@ -33,6 +34,7 @@ export function Home() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [rates, setRates] = useState<Record<string, number>>({});
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     // Post-hydration storage reads (SSR can't see them).
@@ -60,6 +62,22 @@ export function Home() {
         }
       }
     });
+
+    // The chain is the source of truth for claims: check whether any
+    // outstanding links were swept, update their rows, and celebrate.
+    syncSentLinkClaims().then((claimed) => {
+      if (cancelled || claimed.length === 0) return;
+      setActivity(getActivity());
+      const total = claimed.reduce((s, l) => s + l.amountUsd, 0);
+      setToast(
+        claimed.length === 1
+          ? `Your ${formatUsd(claimed[0].amountUsd)} link was claimed 🎉`
+          : `${claimed.length} links (${formatUsd(total)}) were claimed 🎉`
+      );
+      haptic([0, 25, 30, 40]);
+      window.setTimeout(() => setToast(null), 5000);
+    });
+
     return () => {
       cancelled = true;
       window.removeEventListener("tap:settings", handleSettings);
@@ -71,6 +89,21 @@ export function Home() {
 
   return (
     <main className="flex flex-1 flex-col px-6 pb-28 pt-5">
+      {/* Claim-landed toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.button
+            initial={{ opacity: 0, y: -24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1, transition: springs.snappy }}
+            exit={{ opacity: 0, y: -16, transition: { duration: 0.2 } }}
+            onClick={() => setToast(null)}
+            className="fixed inset-x-6 top-4 z-50 mx-auto max-w-sm rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-ios-heavy"
+          >
+            {toast}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <header className="flex items-center justify-between">
         <button
           onClick={() => {

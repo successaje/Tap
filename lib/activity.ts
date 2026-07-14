@@ -55,6 +55,17 @@ export function updateActivity(
   window.localStorage.setItem(KEY, JSON.stringify(list));
 }
 
+/** Patch the activity row tied to a sent link (e.g. when its claim lands). */
+export function updateActivityByLinkId(
+  linkId: string,
+  patch: Partial<Pick<ActivityItem, "status" | "counterparty">>
+) {
+  const list = getActivity().map((a) =>
+    a.linkId === linkId ? { ...a, ...patch } : a
+  );
+  window.localStorage.setItem(KEY, JSON.stringify(list));
+}
+
 /** Relative "2m ago" style timestamp for the feed. */
 export function timeAgo(iso: string): string {
   const s = Math.max(1, Math.floor((Date.now() - Date.parse(iso)) / 1000));
