@@ -54,19 +54,16 @@ export interface FundedLink {
 const SENT_KEY = "tap:sent-real";
 
 /**
- * Real links are possible only when Particle is configured, a real user is
- * signed in, AND we have successfully loaded a live balance (proving the SDK
- * can reach its API). If the balance fetch failed (network error, bad keys),
- * we silently fall back to the mock path so the app stays usable.
+ * Real links are possible once Particle is configured and a real user is
+ * signed in. We don't gate this on a prior successful balance fetch — if
+ * Particle's API is actually unreachable, createTransferTransaction fails
+ * before any signing or fund movement, and the UI surfaces that as a normal
+ * staged error. Gating on a cross-component "reachable" flag instead made
+ * this fragile: navigating here directly (deep link, refresh, bookmark)
+ * without Home having mounted first silently fell back to the mock path.
  */
-let particleReachable: boolean | null = null;
-
-export function markParticleReachable(reachable: boolean) {
-  particleReachable = reachable;
-}
-
 export function canSendReal(): boolean {
-  return particleEnabled && !!getUser()?.address && particleReachable === true;
+  return particleEnabled && !!getUser()?.address;
 }
 
 /**

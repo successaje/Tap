@@ -1,20 +1,31 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 
-// Configuration for web-push
+// Configuration for web-push. VAPID private keys are 32-byte values,
+// base64url-encoded to 43 characters — validate the shape before handing it
+// to web-push, whose setVapidDetails() throws synchronously on a bad key.
+// Doing that unguarded at module scope previously took the ENTIRE production
+// build down (Next collects page data for all routes, including this one)
+// whenever the env var was unset or a placeholder — not just push.
 const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "";
+const vapidConfigured =
+  publicVapidKey.length === 87 && privateVapidKey.length === 43;
 
-if (publicVapidKey && privateVapidKey) {
+if (vapidConfigured) {
   webpush.setVapidDetails(
-    "mailto:hello@tap.cash", // Your contact email
+    "mailto:hello@tap.cash",
     publicVapidKey,
     privateVapidKey
+  );
+} else if (publicVapidKey || privateVapidKey) {
+  console.warn(
+    "[tap] VAPID keys are set but malformed — push notifications disabled. Generate real ones with `npx web-push generate-vapid-keys`."
   );
 }
 
 export async function POST(req: Request) {
-  if (!publicVapidKey || !privateVapidKey) {
+  if (!vapidConfigured) {
     return NextResponse.json(
       { error: "VAPID keys not configured" },
       { status: 500 }

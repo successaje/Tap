@@ -8,7 +8,7 @@ import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
 import { getBalance } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
-import { markParticleReachable, syncSentLinkClaims } from "@/lib/links";
+import { syncSentLinkClaims } from "@/lib/links";
 import { isSubscribed, triggerTestPush } from "@/lib/push";
 import { getActivity, pruneDemoArtifacts, timeAgo, type ActivityItem } from "@/lib/activity";
 import { formatUsd } from "@/lib/mock";
@@ -55,14 +55,7 @@ export function Home() {
     if (!u?.address) return;
     let cancelled = false;
     getUnifiedBalance(u.address).then((b) => {
-      if (!cancelled) {
-        if (b) {
-          setUnified(b);
-          markParticleReachable(true);
-        } else {
-          markParticleReachable(false);
-        }
-      }
+      if (!cancelled && b) setUnified(b);
     });
 
     // The chain is the source of truth for claims: check whether any

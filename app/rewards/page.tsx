@@ -7,7 +7,6 @@ import { Copy, Gift, Share2, ArrowLeft } from "lucide-react";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser } from "@/lib/auth";
 import { getActivity } from "@/lib/activity";
-import { getReferrals, getTotalReferralPoints, seedDemoReferrals, type Referral } from "@/lib/referrals";
 
 // Points are earned from real money moved through tap — 100 per $1 — so the
 // number reflects what you've actually done, not a hardcoded figure.
@@ -23,7 +22,6 @@ const TIERS = [
 export default function RewardsPage() {
   const router = useRouter();
   const [points, setPoints] = useState(0);
-  const [refs, setRefs] = useState<Referral[]>([]);
   const [refCode, setRefCode] = useState("you");
   // Host starts as the brand default so the first client render matches SSR;
   // the effect swaps in the real host to avoid a hydration mismatch.
@@ -32,14 +30,8 @@ export default function RewardsPage() {
 
   /* eslint-disable react-hooks/set-state-in-effect -- post-hydration reads */
   useEffect(() => {
-    seedDemoReferrals();
-    
     const volume = getActivity().reduce((sum, a) => sum + Math.abs(a.amountUsd), 0);
-    const activityPoints = Math.round(volume * PER_USD);
-    const referralPoints = getTotalReferralPoints();
-    
-    setPoints(activityPoints + referralPoints);
-    setRefs(getReferrals());
+    setPoints(Math.round(volume * PER_USD));
     setHost(window.location.host);
     const u = getUser();
     if (u) setRefCode((u.name?.split(" ")[0] || u.email?.split("@")[0] || "you").toLowerCase());
@@ -180,45 +172,6 @@ export default function RewardsPage() {
         </div>
       </motion.section>
 
-      {refs.length > 0 && (
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.4 } }}
-          className="mt-10"
-        >
-          <h2 className="text-sm font-semibold text-slate-900">Your friends</h2>
-          <ul className="mt-4 space-y-2">
-            {refs.map((r) => (
-              <li
-                key={r.id}
-                className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-slate-50 font-semibold text-slate-500">
-                    {r.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{r.name}</p>
-                    <p className="text-xs font-medium text-slate-400">
-                      {r.activated ? "Activated" : "Joined"}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p
-                    className={`text-sm font-semibold tabular-nums ${
-                      r.bonusPoints > 0 ? "text-emerald-600" : "text-slate-400"
-                    }`}
-                  >
-                    +{r.bonusPoints}
-                  </p>
-                  <p className="text-[10px] font-medium text-slate-300">PTS</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </motion.section>
-      )}
     </main>
   );
 }
