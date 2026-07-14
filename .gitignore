@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# personal prep material — not part of the public submission
+OVER.md
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
