@@ -6,6 +6,7 @@ import { CountUp } from "@/components/count-up";
 import { springs, haptic } from "@/lib/motion";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings } from "@/lib/settings";
+import { friendlyError } from "@/lib/errors";
 import type { PaymentLink } from "@/lib/mock";
 import type { TransferReceipt } from "@/lib/particle";
 
@@ -104,7 +105,8 @@ export function ClaimMoment({
         })
         .catch((err: unknown) => {
           claimInFlight.current = false;
-          setError(err instanceof Error ? err.message : String(err));
+          console.error("[tap:claim] claim error:", err);
+          setError(friendlyError(err));
           setPhase("error");
         });
       // Once the ripple has filled, hold on "processing" until the sweep lands.

@@ -10,6 +10,7 @@ import { getUser, type AppUser } from "@/lib/auth";
 import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum, getUnifiedBalance } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
+import { friendlyError } from "@/lib/errors";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 import { Landmark, CreditCard, Wallet, Check, X, ArrowLeft, ClipboardPaste } from "lucide-react";
 
@@ -90,7 +91,8 @@ export default function WithdrawPage() {
       setExplorerUrl(url);
       setPhase("sent");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      console.error("[tap:withdraw] send error:", err);
+      setError(friendlyError(err));
       setPhase("error");
     }
   }

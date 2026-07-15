@@ -10,6 +10,7 @@ import { getUser, beginGoogleLogin, authEnabled, type AppUser } from "@/lib/auth
 import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
+import { friendlyError } from "@/lib/errors";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 interface PayRequest {
@@ -97,7 +98,8 @@ export default function PayPage() {
       haptic([0, 30, 40, 60]);
       setPhase("paid");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      console.error("[tap:pay] pay error:", err);
+      setError(friendlyError(err));
       setPhase("error");
     }
   }

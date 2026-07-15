@@ -10,6 +10,7 @@ import { createLink, getUser } from "@/lib/store";
 import { canSendReal, createFundedLink } from "@/lib/links";
 import { getUnifiedBalance } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
+import { friendlyError } from "@/lib/errors";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 type Phase = "compose" | "funding" | "created";
@@ -108,7 +109,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       setPhase("created");
     } catch (err) {
       console.error("[tap:send] REAL path error:", err);
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
       setPhase("compose");
     }
   }
