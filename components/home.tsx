@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { SupportSheet } from "@/components/support-sheet";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
 import { getBalance } from "@/lib/store";
@@ -37,6 +38,36 @@ export function Home() {
   const [rates, setRates] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
 
+  // Re-run everything that can change: balance, activity, and claim
+  // detection. Shared by first mount and pull-to-refresh so there's exactly
+  // one code path for "what does fresh data look like."
+  async function refreshHome(address: string | undefined) {
+    setActivity(getActivity());
+    if (!address) return;
+
+    const balancePromise = getUnifiedBalance(address).then((b) => {
+      if (b) setUnified(b);
+    });
+
+    const claimsPromise = syncSentLinkClaims().then((claimed) => {
+      if (claimed.length === 0) return;
+      setActivity(getActivity());
+      const total = claimed.reduce((s, l) => s + l.amountUsd, 0);
+      const message =
+        claimed.length === 1
+          ? `Your ${formatUsd(claimed[0].amountUsd)} link was claimed 🎉`
+          : `${claimed.length} links (${formatUsd(total)}) were claimed 🎉`;
+      setToast(message);
+      haptic([0, 25, 30, 40]);
+      window.setTimeout(() => setToast(null), 5000);
+      isSubscribed().then((on) => {
+        if (on) triggerTestPush("Money claimed", message, "/");
+      });
+    });
+
+    await Promise.all([balancePromise, claimsPromise]);
+  }
+
   useEffect(() => {
     // Post-hydration storage reads (SSR can't see them).
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -52,33 +83,9 @@ export function Home() {
     const handleSettings = () => setSettings(getSettings());
     window.addEventListener("tap:settings", handleSettings);
 
-    if (!u?.address) return;
-    let cancelled = false;
-    getUnifiedBalance(u.address).then((b) => {
-      if (!cancelled && b) setUnified(b);
-    });
-
-    // The chain is the source of truth for claims: check whether any
-    // outstanding links were swept, update their rows, and celebrate.
-    syncSentLinkClaims().then((claimed) => {
-      if (cancelled || claimed.length === 0) return;
-      setActivity(getActivity());
-      const total = claimed.reduce((s, l) => s + l.amountUsd, 0);
-      const message =
-        claimed.length === 1
-          ? `Your ${formatUsd(claimed[0].amountUsd)} link was claimed 🎉`
-          : `${claimed.length} links (${formatUsd(total)}) were claimed 🎉`;
-      setToast(message);
-      haptic([0, 25, 30, 40]);
-      window.setTimeout(() => setToast(null), 5000);
-      // Also land it in the notification tray for subscribed users.
-      isSubscribed().then((on) => {
-        if (on) triggerTestPush("Money claimed", message, "/");
-      });
-    });
+    refreshHome(u?.address);
 
     return () => {
-      cancelled = true;
       window.removeEventListener("tap:settings", handleSettings);
     };
   }, []);
@@ -86,7 +93,13 @@ export function Home() {
   const balance = unified !== undefined && unified !== null ? unified.totalUsd : mockBalance;
   const isLoading = user?.address && unified === undefined;
 
+  async function handlePullRefresh() {
+    haptic(10);
+    await Promise.all([refreshHome(user?.address), getExchangeRates().then(setRates)]);
+  }
+
   return (
+    <PullToRefresh onRefresh={handlePullRefresh}>
     <main className="flex flex-1 flex-col px-6 pb-28 pt-5">
       {/* Claim-landed toast */}
       <AnimatePresence>
@@ -288,5 +301,6 @@ export function Home() {
 
       <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-30 h-32 bg-gradient-to-t from-white to-transparent" />
     </main>
+    </PullToRefresh>
   );
 }
