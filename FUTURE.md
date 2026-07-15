@@ -9,36 +9,35 @@ tap beyond its current product category.
 
 ## Part 1 — Backend infrastructure
 
-tap currently has no backend and no database, as described in the README's
-*Backend and data* section. In priority order, this is what a minimal
-backend would add.
+tap runs almost entirely without a backend, as described in the README's
+*Backend and data* section. One piece of server-side state exists today —
+the background push watcher below — added specifically because it could not
+be built any other way. The remaining items are not yet implemented.
 
-### 1. Background push notifications
-The current implementation delivers a push notification only when a sender's
-own browser tab is open and polling detects a claim. The delivery
-infrastructure already exists (`lib/push.ts`, `/api/push`, VAPID keys,
-service-worker handlers); what is missing is a process watching the chain on
-the user's behalf, independent of any open tab.
+### Implemented — background push notifications
+A sender's own browser tab previously had to be open and polling for "your
+link was claimed" to arrive as a notification. This now works while the app
+is closed: a scheduled job (Upstash QStash, every two minutes, request
+signature verified) checks each outstanding link's balance server-side
+(`app/api/cron/check-claims`) against a small Upstash Redis store
+(`lib/server/kv.ts`) of registered links and push subscriptions, and pushes
+the moment a link empties. Registration happens automatically when a link is
+funded (`lib/links.ts`) and is removed on claim or reclaim, in both cases
+best-effort — a failed call costs a missed notification, never a broken
+transfer. Client-side detection is unchanged and still fires instantly when
+a tab is open; this only closes the gap for when one isn't. Setup
+instructions are in `.env.example`.
 
-Proposed implementation:
-- A key-value store (Vercel KV or Upstash Redis) holding
-  `{ userId, pushSubscription, outstandingLinkAddresses[] }`.
-- A scheduled job (Vercel Cron, every one to two minutes) that checks each
-  outstanding link's balance using the same logic `syncSentLinkClaims()`
-  already runs client-side (`lib/links.ts`), and sends a push directly for
-  any link that emptied since the previous run.
-- No new user-facing surface. This closes an existing feature rather than
-  introducing one.
-
-### 2. Cross-device activity history
+### 1. Cross-device activity history
 Signing in on a new device currently shows the correct balance, read live
 from the chain, but an empty activity feed, since history is stored in
 `localStorage`. Moving activity writes to a small API backed by the same
-data store, keyed by the user's Magic email or EOA address, resolves this
+Redis store, keyed by the user's Magic email or EOA address, resolves this
 with `localStorage` retained as a local cache. The read/write shape in
-`lib/activity.ts` requires minimal change.
+`lib/activity.ts` requires minimal change, and the store already exists for
+the push feature above.
 
-### 3. Referral attribution
+### 2. Referral attribution
 Referral tracking requires a server because a referring device cannot
 observe activity on a referred device. A minimal version: a `?ref=`
 parameter writes a pending referral record keyed by referral code; when the
@@ -47,13 +46,13 @@ scheduled job marks the referral activated and credits the referrer. An
 earlier version of this feature was removed from the codebase rather than
 shipped with fabricated data — see `lib/referrals.ts` in git history.
 
-### 4. Aggregate metrics
+### 3. Aggregate metrics
 Product-level statistics ("total volume moved," "links claimed") become
-meaningful once activity history is centralized (item 2), since they are an
+meaningful once activity history is centralized (item 1), since they are an
 aggregate query over the same store rather than a separate system.
 
-Each item above is independently shippable and does not require changes to
-the account architecture already in production.
+Each remaining item is independently shippable and does not require changes
+to the account architecture already in production.
 
 ---
 
@@ -86,7 +85,7 @@ Implementation outline:
 4. Settlement is a standard `transferOnArbitrum()` call per participant to
    the event creator's address; no new on-chain mechanism is required.
 5. A live "N of M paid" state across participants' devices requires the
-   cross-device activity sync described in Part 1, item 2.
+   cross-device activity sync described in Part 1, item 1.
 
 ### B. Durable receive requests
 Invert the direction of the existing request flow: instead of a one-time

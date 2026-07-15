@@ -1,5 +1,7 @@
 "use client";
 
+import { getUser } from "@/lib/auth";
+
 // VAPID public key conversion utility
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -63,13 +65,20 @@ export async function isSubscribed(): Promise<boolean> {
   }
 }
 
-/** Sends the subscription object to our mock API route to store or trigger directly. */
+/**
+ * Persists the subscription server-side, keyed by the signed-in user's EOA —
+ * this is what lets the background watcher (app/api/cron/check-claims) push
+ * to this device even when no tab is open. Without an owner address (signed
+ * out, or mock/no-Particle mode) it still "succeeds" locally; the push just
+ * stays client-triggered only, same as before this existed.
+ */
 async function saveSubscriptionOnServer(subscription: PushSubscription) {
   try {
+    const ownerAddress = getUser()?.address;
     await fetch("/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "subscribe", subscription }),
+      body: JSON.stringify({ action: "subscribe", subscription, ownerAddress }),
     });
   } catch (err) {
     console.error("Failed to save subscription on server", err);

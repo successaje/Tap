@@ -108,14 +108,14 @@ worker.
 | Link funding, claiming, reclaiming | Live. Verified end-to-end with real USDC on Arbitrum mainnet. |
 | Direct pay and cash-out to any address | Live. Same Universal Account and EIP-7702 path as link transfers. |
 | Unified balance, activity feed, claim detection | Live, read directly from the chain. |
-| Push notifications | Live delivery via Web Push and VAPID; currently triggered client-side (see *Backend and data* below). |
+| Push notifications | Live, including background delivery while the app is closed (see *Backend and data* below). |
 | Rewards points | Live, computed from the account's own activity volume. |
 | Bank transfer / debit card cash-out | Not built. Labeled "Soon" in the interface. |
 | Referral attribution | Not built. Requires server-side tracking (see below). |
 
 ## Backend and data
 
-tap has no backend and no database. Application state lives in two places:
+Application state lives in three places:
 
 - **The blockchain**, via Particle's Universal Account API. Balances,
   transfer status, and claim detection (an emptied link balance indicates a
@@ -123,23 +123,28 @@ tap has no backend and no database. Application state lives in two places:
   truth.
 - **`localStorage`, per device.** Session, activity history, settings, and
   outstanding-link keys — client-only, never transmitted.
+- **A small server-side store** (Upstash Redis), used for exactly one
+  purpose: letting push notifications reach a device while the app is
+  closed. When a real link is funded, its address and the sender's push
+  subscription are registered; a scheduled job (Upstash QStash, every two
+  minutes, request-signature verified) checks each outstanding link's balance
+  and pushes "your link was claimed" the moment it empties, then stops
+  watching it. Client-side detection (an open tab noticing the same thing)
+  still fires instantly and is unaffected — this closes the gap for when no
+  tab is open. Both are best-effort: a failed registration only costs a
+  missed notification, never a transfer.
 
-This is sufficient for balances, transfers, and claim status, since the
-chain itself serves as the system of record for those. It is not sufficient
-for a small number of features that require server-side state:
+This is the only server-side state in the app. It is not sufficient, on its
+own, for two related features that remain unbuilt:
 
-- **Push notifications while the app is closed.** The current implementation
-  fires a notification only when an open tab polls and detects a claim. A
-  notification delivered while the app is closed requires a server watching
-  the chain on the user's behalf.
 - **Activity history across devices.** A new device currently shows the
   correct balance (read from the chain) but an empty activity feed, since
-  history is stored locally.
+  history itself is stored locally, not in the same store as above.
 - **Referral attribution.** A referring device cannot observe activity on a
   referred device without a shared server to correlate the two.
 
-A proposed architecture for closing this gap — a serverless watcher backed
-by a small key-value store — is described in [`FUTURE.md`](FUTURE.md).
+Both are scoped out in [`FUTURE.md`](FUTURE.md), along with the full
+architecture of the background watcher above.
 
 ## Track alignment
 

@@ -54,6 +54,34 @@ export interface FundedLink {
 const SENT_KEY = "tap:sent-real";
 
 /**
+ * Best-effort calls to the background watcher (see app/api/cron/check-claims
+ * and FUTURE.md). Never awaited by callers, never throws — a failed
+ * registration only costs a missed push notification, never a broken
+ * transfer. This is the one place tap's client talks to a server at all.
+ */
+function registerLinkForPush(link: {
+  linkId: string;
+  ownerAddress: string;
+  linkAddress: string;
+  amountUsd: number;
+  note?: string;
+}) {
+  fetch("/api/links/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(link),
+  }).catch(() => {});
+}
+
+function unregisterLinkForPush(linkId: string) {
+  fetch("/api/links/unregister", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ linkId }),
+  }).catch(() => {});
+}
+
+/**
  * Real links are possible once Particle is configured and a real user is
  * signed in. We don't gate this on a prior successful balance fetch — if
  * Particle's API is actually unreachable, createTransferTransaction fails
@@ -120,6 +148,16 @@ export async function createFundedLink(
   } catch {
     /* best-effort */
   }
+
+  // Let the server watch this link so a claim can push a notification even
+  // if this tab is closed by the time it happens.
+  registerLinkForPush({
+    linkId: id,
+    ownerAddress: user.address,
+    linkAddress: ephemeral.address,
+    amountUsd,
+    note,
+  });
 
   return link;
 }
@@ -205,6 +243,8 @@ export async function syncSentLinkClaims(): Promise<SentLinkRecord[]> {
       if (balance !== null && balance.totalUsd <= 0.01) {
         newlyClaimed.push(link);
         updateActivityByLinkId(link.id, { status: "settled" });
+        // Stop the server from also detecting this claim and double-pushing.
+        unregisterLinkForPush(link.id);
       }
     } catch {
       /* transient — try again next visit */
@@ -234,6 +274,7 @@ export async function reclaimFundedLink(
   const record = getSentLinks().find((l) => l.id === linkId);
   if (!record) throw new Error("Link not found on this device");
   const receipt = await claimFundedLink(record.privateKey);
+  unregisterLinkForPush(linkId); // reclaimed, not claimed — no push should fire
   window.localStorage.setItem(
     SENT_KEY,
     JSON.stringify(

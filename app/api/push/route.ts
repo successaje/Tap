@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
+import { addSubscription, kvConfigured } from "@/lib/server/kv";
 
 // Configuration for web-push. VAPID private keys are 32-byte values,
 // base64url-encoded to 43 characters — validate the shape before handing it
@@ -34,18 +35,22 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, subscription, payload } = body;
+    const { action, subscription, payload, ownerAddress } = body;
 
     if (action === "subscribe") {
-      // In a real app, you would save the subscription object to your database
-      // linked to the currently authenticated user.
-      // For this MVP, we just accept it.
-      return NextResponse.json({ success: true });
+      // Persisted so the background watcher (app/api/cron/check-claims) can
+      // reach this device even when no tab is open. Without a KV store
+      // configured, subscribing still "succeeds" — push just stays
+      // client-triggered only, same as before this feature existed.
+      if (kvConfigured && ownerAddress && subscription) {
+        await addSubscription(ownerAddress, subscription);
+      }
+      return NextResponse.json({ success: true, persisted: kvConfigured });
     }
 
     if (action === "notify") {
-      // This triggers a push message back to the exact subscription that requested it.
-      // Useful for testing or immediate feedback.
+      // Triggers a push back to the exact subscription that requested it —
+      // the immediate, client-side path (fires only while a tab is open).
       if (!subscription) {
         return NextResponse.json(
           { error: "No subscription provided" },
