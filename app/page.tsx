@@ -60,6 +60,7 @@ export default function Root() {
           user={user}
           onDone={() => {
             markOnboarded();
+            window.dispatchEvent(new Event("tap:auth"));
             setView("home");
           }}
         />

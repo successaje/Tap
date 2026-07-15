@@ -5,6 +5,7 @@ import { Home, QrCode, Landmark } from "lucide-react";
 import { useEffect, useState } from "react";
 import { haptic } from "@/lib/motion";
 import { getUser } from "@/lib/auth";
+import { isOnboarded } from "@/lib/store";
 
 // Only the top-level tabs show the floating pill — deep flows (send, claim,
 // pay, onboarding) and the signed-out landing stay chromeless.
@@ -13,20 +14,24 @@ const ROOT_PATHS = new Set(["/", "/rewards", "/profile"]);
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  // Only for signed-in users — the landing at "/" must stay chromeless.
-  // null until mounted so SSR/first paint renders nothing (no flash, no
-  // hydration mismatch).
+  // Only for signed-in, onboarded users — the landing at "/" and the
+  // first-run Onboarding (rendered inline at "/", not a separate route)
+  // must both stay chromeless. null until mounted so SSR/first paint
+  // renders nothing (no flash, no hydration mismatch).
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [onboarded, setOnboarded] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSignedIn(!!getUser());
-    const onAuth = () => setSignedIn(!!getUser());
-    window.addEventListener("tap:auth", onAuth);
-    return () => window.removeEventListener("tap:auth", onAuth);
+    const sync = () => {
+      setSignedIn(!!getUser());
+      setOnboarded(isOnboarded());
+    };
+    sync();
+    window.addEventListener("tap:auth", sync);
+    return () => window.removeEventListener("tap:auth", sync);
   }, [pathname]);
 
-  if (!signedIn || !ROOT_PATHS.has(pathname)) return null;
+  if (!signedIn || !onboarded || !ROOT_PATHS.has(pathname)) return null;
 
   const navs = [
     { name: "Home", icon: Home, path: "/" },
