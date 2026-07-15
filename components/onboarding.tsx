@@ -47,8 +47,8 @@ export function Onboarding({
     // Request push permissions on finish if possible
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
       setRequestingPush(true);
-      const subscribed = await subscribeToPush();
-      if (subscribed) {
+      const result = await subscribeToPush();
+      if (result.ok) {
         await triggerTestPush(
           "Welcome to tap",
           "Your universal account is ready. Send money with a link anywhere.",

@@ -27,6 +27,29 @@ export default function ProfilePage() {
   const [rates, setRates] = useState<Record<string, number>>({});
   const [pushEnabled, setPushEnabled] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
+  const [pushToast, setPushToast] = useState<string | null>(null);
+
+  function showPushToast(message: string) {
+    setPushToast(message);
+    window.setTimeout(() => setPushToast(null), 5000);
+  }
+
+  function describePushResult(reason?: string, detail?: string): string {
+    switch (reason) {
+      case "unsupported":
+        return "Push isn't supported in this browser.";
+      case "denied":
+        return "Notifications are blocked — enable them in your browser/OS settings.";
+      case "no-vapid-key":
+        return "Push isn't configured on this deployment yet.";
+      case "not-subscribed":
+        return "Not subscribed — tap Enable first.";
+      case "server-error":
+        return detail || "The server couldn't send the notification.";
+      default:
+        return detail || "Something went wrong.";
+    }
+  }
 
   useEffect(() => {
     setUser(getUser());
@@ -81,6 +104,20 @@ export default function ProfilePage() {
 
   return (
     <main className="flex min-h-[100dvh] flex-col bg-slate-50 px-6 pb-28 pt-5">
+      <AnimatePresence>
+        {pushToast && (
+          <motion.button
+            initial={{ opacity: 0, y: -24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1, transition: springs.snappy }}
+            exit={{ opacity: 0, y: -16, transition: { duration: 0.2 } }}
+            onClick={() => setPushToast(null)}
+            className="fixed inset-x-6 top-4 z-50 mx-auto max-w-sm rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-ios-heavy"
+          >
+            {pushToast}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <header className="flex items-center justify-between">
         <button
           onClick={() => {
@@ -225,7 +262,8 @@ export default function ProfilePage() {
                   if (testingPush) return;
                   setTestingPush(true);
                   haptic(10);
-                  await triggerTestPush("Test Notification", "Looks like push notifications are working perfectly! 🎉", "/profile");
+                  const result = await triggerTestPush("Test Notification", "Looks like push notifications are working perfectly! 🎉", "/profile");
+                  if (!result.ok) showPushToast(describePushResult(result.reason, result.detail));
                   setTestingPush(false);
                 }}
                 disabled={testingPush}
@@ -237,8 +275,9 @@ export default function ProfilePage() {
               <button
                 onClick={async () => {
                   haptic(10);
-                  const subbed = await subscribeToPush();
-                  setPushEnabled(subbed);
+                  const result = await subscribeToPush();
+                  setPushEnabled(result.ok);
+                  if (!result.ok) showPushToast(describePushResult(result.reason, result.detail));
                 }}
                 className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-transform active:scale-95 shadow-md shadow-accent/20"
               >

@@ -14,9 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const description = "Send money with a link. No wallets, no chains, no gas — just tap.";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://tap-xyz.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "tap",
-  description: "Send money with a link. Tap to claim.",
+  description,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -26,6 +31,17 @@ export const metadata: Metadata = {
   icons: {
     icon: "/icons/icon.svg",
     apple: "/icons/icon-192.png",
+  },
+  openGraph: {
+    title: "tap — send money with a link",
+    description,
+    images: [{ url: "/api/og", width: 1200, height: 630, alt: "tap" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "tap — send money with a link",
+    description,
+    images: ["/api/og"],
   },
 };
 

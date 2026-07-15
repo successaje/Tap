@@ -14,19 +14,25 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+export interface PushResult {
+  ok: boolean;
+  /** Machine-readable reason, so the UI can show something more useful than "it failed." */
+  reason?: "unsupported" | "denied" | "no-vapid-key" | "not-subscribed" | "server-error" | "error";
+  detail?: string;
+}
+
 /**
  * Request notification permissions and subscribe to the push manager.
- * Returns true if subscribed successfully, false otherwise.
  */
-export async function subscribeToPush(): Promise<boolean> {
+export async function subscribeToPush(): Promise<PushResult> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    return false;
+    return { ok: false, reason: "unsupported" };
   }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
-      return false;
+      return { ok: false, reason: "denied" };
     }
 
     const registration = await navigator.serviceWorker.ready;
@@ -35,10 +41,9 @@ export async function subscribeToPush(): Promise<boolean> {
     if (!subscription) {
       const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicVapidKey) {
-        console.error("VAPID public key not found in environment.");
-        return false;
+        return { ok: false, reason: "no-vapid-key" };
       }
-      
+
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicVapidKey),
@@ -46,11 +51,11 @@ export async function subscribeToPush(): Promise<boolean> {
     }
 
     // Save the subscription to the backend
-    await saveSubscriptionOnServer(subscription);
-    return true;
+    const saved = await saveSubscriptionOnServer(subscription);
+    if (!saved.ok) return saved;
+    return { ok: true };
   } catch (err) {
-    console.error("Failed to subscribe to push notifications", err);
-    return false;
+    return { ok: false, reason: "error", detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -72,16 +77,21 @@ export async function isSubscribed(): Promise<boolean> {
  * out, or mock/no-Particle mode) it still "succeeds" locally; the push just
  * stays client-triggered only, same as before this existed.
  */
-async function saveSubscriptionOnServer(subscription: PushSubscription) {
+async function saveSubscriptionOnServer(subscription: PushSubscription): Promise<PushResult> {
   try {
     const ownerAddress = getUser()?.address;
-    await fetch("/api/push", {
+    const res = await fetch("/api/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "subscribe", subscription, ownerAddress }),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, reason: "server-error", detail: body.error };
+    }
+    return { ok: true };
   } catch (err) {
-    console.error("Failed to save subscription on server", err);
+    return { ok: false, reason: "server-error", detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -89,19 +99,30 @@ async function saveSubscriptionOnServer(subscription: PushSubscription) {
  * Triggers a test push notification by asking the server to push a payload
  * back down to the current subscription.
  */
-export async function triggerTestPush(title: string, body: string, url?: string) {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+export async function triggerTestPush(title: string, body: string, url?: string): Promise<PushResult> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return { ok: false, reason: "unsupported" };
+  }
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
-  if (!subscription) return;
+  if (!subscription) return { ok: false, reason: "not-subscribed" };
 
-  await fetch("/api/push", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "notify",
-      subscription,
-      payload: { title, body, url },
-    }),
-  });
+  try {
+    const res = await fetch("/api/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "notify",
+        subscription,
+        payload: { title, body, url },
+      }),
+    });
+    if (!res.ok) {
+      const responseBody = await res.json().catch(() => ({}));
+      return { ok: false, reason: "server-error", detail: responseBody.error };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: "server-error", detail: err instanceof Error ? err.message : String(err) };
+  }
 }
