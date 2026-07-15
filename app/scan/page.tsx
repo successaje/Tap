@@ -4,8 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, ImageOff, Keyboard } from "lucide-react";
 import { haptic } from "@/lib/motion";
+import jsQR from "jsqr";
 
-// Minimal typing for the BarcodeDetector API (not yet in lib.dom).
+// Minimal typing for the BarcodeDetector API (not yet in lib.dom). Chrome on
+// Android has it; Safari and Firefox never have — jsQR (pure JS, decodes
+// from raw pixel data) is the fallback that actually works everywhere a
+// camera does, so scanning isn't Android-only.
 interface DetectedBarcode {
   rawValue: string;
 }
@@ -49,18 +53,25 @@ export default function ScanPage() {
   const [manualError, setManualError] = useState(false);
 
   useEffect(() => {
-    const Ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor })
-      .BarcodeDetector;
-    if (!Ctor || !navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus("unsupported");
       return;
     }
 
+    // Native BarcodeDetector (Chrome/Android) decodes straight off the video
+    // frame and is cheaper; everywhere else falls back to jsQR against a
+    // sampled canvas frame. Camera access itself never depends on which one
+    // is available — only the decode step differs.
+    const Ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor })
+      .BarcodeDetector;
+    const detector = Ctor ? new Ctor({ formats: ["qr_code"] }) : null;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
     let stream: MediaStream | null = null;
     let raf = 0;
     let done = false;
-    const detector = new Ctor({ formats: ["qr_code"] });
 
     async function start() {
       try {
@@ -78,19 +89,33 @@ export default function ScanPage() {
       }
     }
 
+    async function decode(video: HTMLVideoElement): Promise<string | null> {
+      if (detector) {
+        try {
+          const codes = await detector.detect(video);
+          return codes.map((c) => c.rawValue).find(Boolean) ?? null;
+        } catch {
+          return null; // transient decode error — keep scanning
+        }
+      }
+      if (!ctx || video.videoWidth === 0) return null;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(frame.data, frame.width, frame.height);
+      return result?.data ?? null;
+    }
+
     async function tick() {
       if (done || !videoRef.current) return;
-      try {
-        const codes = await detector.detect(videoRef.current);
-        const hit = codes.map((c) => toTapRoute(c.rawValue)).find(Boolean);
-        if (hit) {
-          done = true;
-          haptic([0, 30, 40, 60]);
-          router.push(hit);
-          return;
-        }
-      } catch {
-        /* transient decode error — keep scanning */
+      const raw = await decode(videoRef.current);
+      const hit = raw ? toTapRoute(raw) : null;
+      if (hit) {
+        done = true;
+        haptic([0, 30, 40, 60]);
+        router.push(hit);
+        return;
       }
       raf = requestAnimationFrame(tick);
     }
