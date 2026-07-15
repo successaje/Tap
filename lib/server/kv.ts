@@ -122,3 +122,42 @@ export async function getStats(): Promise<Record<string, number>> {
   for (const [k, v] of Object.entries(all)) out[k] = Number(v) || 0;
   return out;
 }
+
+const AGENT_CHALLENGE_KEY = (id: string) => `agent:challenge:${id}`;
+const AGENT_CHALLENGE_TTL_SECONDS = 300;
+
+export interface AgentChallenge {
+  id: string;
+  receiver: string;
+  priceUsd: number;
+  balanceAtIssueUsd: number;
+  issuedAt: string;
+}
+
+/**
+ * The x402 demo (app/api/agent/resource) verifies payment by comparing the
+ * receiver's balance at 402-issue-time against its balance when the client
+ * retries with proof — not by parsing a transaction receipt. A challenge is
+ * the balance snapshot that comparison is made against; it self-expires so a
+ * stale one can't be replayed against a later, unrelated balance increase.
+ */
+export async function createAgentChallenge(
+  challenge: AgentChallenge
+): Promise<void> {
+  if (!redis) return;
+  await redis.set(AGENT_CHALLENGE_KEY(challenge.id), JSON.stringify(challenge), {
+    ex: AGENT_CHALLENGE_TTL_SECONDS,
+  });
+}
+
+export async function getAgentChallenge(id: string): Promise<AgentChallenge | null> {
+  if (!redis) return null;
+  const raw = await redis.get<string | AgentChallenge>(AGENT_CHALLENGE_KEY(id));
+  if (!raw) return null;
+  return typeof raw === "string" ? JSON.parse(raw) : raw;
+}
+
+export async function consumeAgentChallenge(id: string): Promise<void> {
+  if (!redis) return;
+  await redis.del(AGENT_CHALLENGE_KEY(id));
+}
