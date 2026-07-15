@@ -71,11 +71,17 @@ export async function POST(req: Request) {
         // reinstalled) surfaces here as a 404/410 from the push service —
         // report it plainly instead of a generic 500 so the client can tell
         // the difference between "broken" and "just resubscribe."
-        const statusCode = (err as { statusCode?: number })?.statusCode;
+        const webpushErr = err as { statusCode?: number; body?: string; message?: string };
+        const statusCode = webpushErr?.statusCode;
+        console.error("[tap] webpush.sendNotification failed", {
+          statusCode,
+          body: webpushErr?.body,
+          message: webpushErr?.message,
+        });
         const message =
           statusCode === 404 || statusCode === 410
             ? "Subscription expired — re-enable push notifications."
-            : `Push send failed (${statusCode ?? "unknown"})`;
+            : `Push send failed (${statusCode ?? "unknown"}): ${webpushErr?.body || webpushErr?.message || "no detail"}`;
         return NextResponse.json({ error: message }, { status: statusCode === 404 || statusCode === 410 ? 410 : 502 });
       }
       return NextResponse.json({ success: true });
