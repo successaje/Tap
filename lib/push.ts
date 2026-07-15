@@ -21,6 +21,35 @@ export interface PushResult {
   detail?: string;
 }
 
+function sameApplicationServerKey(subscription: PushSubscription, expected: Uint8Array): boolean {
+  const current = subscription.options?.applicationServerKey;
+  if (!current) return true; // can't compare on this browser — don't force a re-subscribe loop
+  const currentBytes = new Uint8Array(current);
+  return currentBytes.length === expected.length && currentBytes.every((b, i) => b === expected[i]);
+}
+
+/**
+ * A subscription created under a previous VAPID keypair looks identical to a
+ * healthy one client-side — the browser has no reason to drop it — but every
+ * send fails server-side with a key-hash mismatch (this happened for real:
+ * VAPID_PRIVATE_KEY was a placeholder early on, then replaced with a real
+ * keypair, orphaning any subscription made before that). Detect and clear it
+ * here so callers always get either a working subscription or null.
+ */
+async function getValidSubscription(
+  registration: ServiceWorkerRegistration
+): Promise<PushSubscription | null> {
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return null;
+
+  const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (publicVapidKey && !sameApplicationServerKey(subscription, urlBase64ToUint8Array(publicVapidKey))) {
+    await subscription.unsubscribe().catch(() => {});
+    return null;
+  }
+  return subscription;
+}
+
 /**
  * Request notification permissions and subscribe to the push manager.
  */
@@ -36,7 +65,7 @@ export async function subscribeToPush(): Promise<PushResult> {
     }
 
     const registration = await navigator.serviceWorker.ready;
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription = await getValidSubscription(registration);
 
     if (!subscription) {
       const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -63,8 +92,7 @@ export async function isSubscribed(): Promise<boolean> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return false;
   try {
     const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-    return !!subscription;
+    return !!(await getValidSubscription(registration));
   } catch {
     return false;
   }
@@ -104,7 +132,7 @@ export async function triggerTestPush(title: string, body: string, url?: string)
     return { ok: false, reason: "unsupported" };
   }
   const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const subscription = await getValidSubscription(registration);
   if (!subscription) return { ok: false, reason: "not-subscribed" };
 
   try {
