@@ -117,55 +117,65 @@ attached. The underlying account primitives tap already implements —
 Universal Account creation, cross-chain transfer, on-chain receipt
 verification — are the components x402 requires from a payer implementation.
 
+**A minimal slice of this is built and runs today**, not just outlined:
+[`app/api/agent/resource`](app/api/agent/resource/route.ts) issues a real
+402 with payment requirements, and [`scripts/agent-demo.mjs`](scripts/agent-demo.mjs)
+is a standalone script — no browser, no human, no Next.js dependency — that
+pays it in real USDC on Arbitrum using the same account primitives as the
+rest of the product, then retries with proof and receives the resource.
+Payment is verified by comparing the receiver's balance at challenge-issue
+time against its balance on retry, rather than by parsing an individual
+transaction's receipt — a deliberate simplification for a proof of concept,
+documented in the route itself, that would need to become per-transaction
+verification before this could serve more than one concurrent request.
+
 ```
 Agent A (caller)                    Agent B (service)
      │                                     │
-     │──── GET /api/resource ────────────▶│
+     │──── GET /api/agent/resource ──────▶│
      │                                     │
-     │◀─── 402 Payment Required ──────────│  { amount, chain: Arbitrum,
-     │       + payment requirements       │    receiver, asset: USDC }
+     │◀─── 402 Payment Required ──────────│  { challengeId, price, chain,
+     │       + payment requirements       │    receiver }
      │                                     │
-     │  tap-agent-sdk pays via the        │
-     │  caller's Universal Account,       │
-     │  reusing transferOnArbitrum()      │
+     │  scripts/agent-demo.mjs pays via   │
+     │  its own Universal Account,        │
+     │  real USDC, real Arbitrum          │
      │                                     │
-     │──── GET /api/resource ────────────▶│
-     │      + X-PAYMENT: <tx proof>       │
+     │──── GET /api/agent/resource ──────▶│
+     │      X-Payment-Id, X-Payment-Tx    │
      │                                     │
-     │◀─── 200 OK + resource ─────────────│  (B verifies the on-chain
-     │                                     │   receipt before releasing)
+     │◀─── 200 OK + resource ─────────────│  (B checks the receiver's
+     │                                     │   balance moved by that much)
 ```
 
-Implementation outline:
-1. **Agent identity.** Each agent requires a Universal Account without an
-   interactive Google login on every call. Two approaches: a human owner
-   authenticates once via the existing Magic flow and issues a scoped,
-   long-lived credential for server-side use by their agent, or Magic's
-   server-side authentication is used directly (current documentation
-   should be consulted at implementation time, as this surface evolves
-   quickly). The Particle Universal Account layer in `lib/particle.ts` is
-   already identity-agnostic — it requires only an EOA and a signer, which
-   either approach provides.
-2. **`tap-agent-sdk`.** A thin wrapper exposing `pay(requirements)` and
-   `verifyPayment(txProof)`, built directly on the existing
-   `transferOnArbitrum()` and `getUniversalAccount()` functions — largely
-   a packaging exercise rather than new payment logic.
-3. **x402 middleware.** A small server-side middleware for the receiving
-   agent that issues the 402 response with payment requirements and
-   validates the `X-PAYMENT` proof against Particle's transaction API
-   before releasing the resource.
+What's left to go from this proof of concept to the direction described
+above:
+1. **Agent identity without a human in the loop on every call.** The demo
+   script holds its own raw private key — fine for a demo, not how a real
+   agent would be provisioned. A human owner authenticating once via the
+   existing Magic flow and issuing a scoped, long-lived credential for
+   their agent's server-side use is the likely shape; Magic's server-side
+   authentication is the other option (current documentation should be
+   consulted at implementation time, as this surface evolves quickly). The
+   Particle Universal Account layer in `lib/particle.ts` is already
+   identity-agnostic — it requires only an EOA and a signer, which either
+   approach provides.
+2. **Per-transaction payment verification**, replacing the balance-delta
+   check above — necessary once more than one payment can be outstanding
+   against the same receiver at once.
+3. **`tap-agent-sdk`.** Packaging `scripts/agent-demo.mjs`'s payment logic
+   into a reusable `pay(requirements)` / `verifyPayment(txProof)` client,
+   rather than a standalone script.
 4. **Human interface.** The core payment loop requires no human-facing UI.
    A monitoring surface for the account owner — spend limits, transaction
    log, funding and cash-out — can reuse tap's existing Home, Activity, and
    Cash-out screens with minimal modification.
 
-This direction carries the highest execution risk of the three: x402 is an
-early-stage standard, agent identity delegation requires implementation
-research against current provider documentation, and the core interaction
-has no human-facing moment to evaluate against the hackathon's UX criterion.
-It is also the direction with the least overlap with existing link-payment
-products, and the closest alignment with where agent-native payment
-infrastructure is heading.
+This direction has the least overlap with existing link-payment products,
+and the closest alignment with where agent-native payment infrastructure is
+heading — and unlike when this was purely a roadmap item, the core payment
+mechanism is no longer a research question, since the proof of concept above
+already moves real money on a 402 challenge/response.
 
 ### Relative priority
 
@@ -178,8 +188,10 @@ strategic value:
    new data model, most valuable once cross-device activity sync (Part 1)
    is in place.
 3. **Agent-to-agent micropayments** — highest ceiling and the direction
-   with the most distinct market position, but requires dedicated research
-   time on agent identity and x402 before implementation begins.
+   with the most distinct market position. A working proof of concept
+   already exists (see above); what's left is agent identity delegation
+   and production-grade payment verification, not a research phase before
+   implementation can begin.
 
 None of these directions require modification to the core payment
 architecture currently in production.

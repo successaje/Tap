@@ -203,6 +203,15 @@ above, and three application-layer directions on the same account
 architecture — group expense settlement, durable receive requests, and
 agent-to-agent micropayments.
 
+The last of those already has a working proof of concept in this repo:
+[`app/api/agent/resource`](app/api/agent/resource/route.ts) issues a real
+HTTP 402 with payment requirements, and [`scripts/agent-demo.mjs`](scripts/agent-demo.mjs)
+is a standalone script — no browser, no human — that pays it in real USDC
+on Arbitrum through the same Universal Account primitives as the rest of
+the product, then retries with proof and receives the resource. It's a
+proof of concept, not a finished payment gateway — see `FUTURE.md` for
+exactly what's simplified and what a production version would need.
+
 ---
 
 <div align="center"><sub>Built during UXmaxx.</sub></div>
