@@ -1,4 +1,5 @@
 import "server-only";
+import { TX_KINDS, type TxKind } from "@/lib/server/kv";
 
 export const isAddress = (v: unknown): v is string =>
   typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v);
@@ -18,3 +19,6 @@ export function sanitizeNote(note: unknown): string | undefined {
   if (!trimmed) return undefined;
   return trimmed.slice(0, MAX_NOTE_LENGTH);
 }
+
+export const isTxKind = (v: unknown): v is TxKind =>
+  typeof v === "string" && (TX_KINDS as readonly string[]).includes(v);

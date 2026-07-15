@@ -10,6 +10,7 @@
 
 import { getUser } from "@/lib/store";
 import { magicUaSigner } from "@/lib/magic";
+import { recordTransactionStat } from "@/lib/stats";
 import {
   particleEnabled,
   transferOnArbitrum,
@@ -114,6 +115,7 @@ export async function createFundedLink(
     amountUsd,
     magicUaSigner()
   );
+  recordTransactionStat("send", receipt.sentUsd);
 
   const id = ephemeral.address.slice(2, 10).toLowerCase();
   const params = new URLSearchParams({
@@ -274,6 +276,7 @@ export async function reclaimFundedLink(
   const record = getSentLinks().find((l) => l.id === linkId);
   if (!record) throw new Error("Link not found on this device");
   const receipt = await claimFundedLink(record.privateKey);
+  recordTransactionStat("reclaim", receipt.sentUsd);
   unregisterLinkForPush(linkId); // reclaimed, not claimed — no push should fire
   window.localStorage.setItem(
     SENT_KEY,

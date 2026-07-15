@@ -101,3 +101,24 @@ export async function getWatchedLinks(): Promise<WatchedLink[]> {
     typeof v === "string" ? JSON.parse(v) : (v as unknown as WatchedLink)
   );
 }
+
+export const TX_KINDS = ["send", "claim", "reclaim", "pay", "withdraw"] as const;
+export type TxKind = (typeof TX_KINDS)[number];
+
+const STATS_KEY = "stats:tx";
+
+/** Real-money-movement counter — the only source of "how much has actually moved" numbers. */
+export async function recordTransaction(kind: TxKind, amountUsd: number) {
+  if (!redis) return;
+  await redis.hincrby(STATS_KEY, `${kind}Count`, 1);
+  await redis.hincrbyfloat(STATS_KEY, `${kind}Volume`, amountUsd);
+}
+
+export async function getStats(): Promise<Record<string, number>> {
+  if (!redis) return {};
+  const all = await redis.hgetall<Record<string, string | number>>(STATS_KEY);
+  if (!all) return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(all)) out[k] = Number(v) || 0;
+  return out;
+}

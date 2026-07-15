@@ -11,6 +11,7 @@ import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum, getUnifiedBalance } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
 import { friendlyError } from "@/lib/errors";
+import { recordTransactionStat } from "@/lib/stats";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 import { Landmark, CreditCard, Wallet, Check, X, ArrowLeft, ClipboardPaste } from "lucide-react";
 
@@ -76,6 +77,7 @@ export default function WithdrawPage() {
           magicUaSigner()
         );
         url = receipt.explorerUrl;
+        recordTransactionStat("withdraw", receipt.sentUsd);
       } else {
         await new Promise((r) => setTimeout(r, 1400)); // mock fallback
       }

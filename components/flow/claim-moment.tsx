@@ -7,6 +7,7 @@ import { springs, haptic } from "@/lib/motion";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings } from "@/lib/settings";
 import { friendlyError } from "@/lib/errors";
+import { recordTransactionStat } from "@/lib/stats";
 import type { PaymentLink } from "@/lib/mock";
 import type { TransferReceipt } from "@/lib/particle";
 
@@ -100,6 +101,7 @@ export function ClaimMoment({
       claim()
         .then((r) => {
           setReceipt(r);
+          recordTransactionStat("claim", r.sentUsd);
           haptic([0, 30, 40, 60]);
           setPhase("landed");
         })

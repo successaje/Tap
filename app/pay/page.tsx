@@ -11,6 +11,7 @@ import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
 import { friendlyError } from "@/lib/errors";
+import { recordTransactionStat } from "@/lib/stats";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 interface PayRequest {
@@ -82,6 +83,7 @@ export default function PayPage() {
           magicUaSigner()
         );
         url = receipt.explorerUrl;
+        recordTransactionStat("pay", receipt.sentUsd);
       } else {
         // Mock fallback keeps the flow demoable without credentials.
         await new Promise((r) => setTimeout(r, 1400));
