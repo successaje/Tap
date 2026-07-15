@@ -3,12 +3,20 @@ import type { NextRequest } from "next/server";
 
 export const runtime = "edge";
 
+// Deliberately not derived from the request's Host header — an edge function
+// trusting `new URL(req.url).origin` for a server-side fetch is a classic
+// host-header-injection footgun. This always points at the real deployment.
+const SITE_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || "https://tap-xyz.vercel.app";
+
+const MAX_FIELD_LENGTH = 60;
+const MAX_NOTE_LENGTH = 140;
+
 export async function GET(req: NextRequest) {
-  const { searchParams, origin } = new URL(req.url);
-  const sender = searchParams.get("from") || "Someone";
+  const { searchParams } = new URL(req.url);
+  const sender = (searchParams.get("from") || "Someone").slice(0, MAX_FIELD_LENGTH);
   const amountRaw = Number(searchParams.get("a"));
-  const note = searchParams.get("n");
-  const hasAmount = amountRaw > 0;
+  const note = searchParams.get("n")?.slice(0, MAX_NOTE_LENGTH) || null;
+  const hasAmount = Number.isFinite(amountRaw) && amountRaw > 0 && amountRaw <= 1_000_000;
   const amount = hasAmount
     ? amountRaw.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : null;
@@ -39,7 +47,7 @@ export async function GET(req: NextRequest) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (edge Satori renderer), not a DOM <img>. */}
           <img
-            src={`${origin}/icons/icon-192.png`}
+            src={`${SITE_ORIGIN}/icons/icon-192.png`}
             width={96}
             height={96}
             style={{ borderRadius: 24 }}

@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
-import { addSubscription, kvConfigured } from "@/lib/server/kv";
+import { addSubscription, checkRateLimit, kvConfigured } from "@/lib/server/kv";
+import { isAddress } from "@/lib/server/validate";
+
+function isPushSubscriptionShape(v: unknown): v is { endpoint: string; keys: { p256dh: string; auth: string } } {
+  if (!v || typeof v !== "object") return false;
+  const s = v as Record<string, unknown>;
+  if (typeof s.endpoint !== "string" || !s.endpoint.startsWith("https://")) return false;
+  const keys = s.keys as Record<string, unknown> | undefined;
+  return !!keys && typeof keys.p256dh === "string" && typeof keys.auth === "string";
+}
 
 // Configuration for web-push. VAPID private keys are 32-byte values,
 // base64url-encoded to 43 characters — validate the shape before handing it
@@ -42,25 +51,34 @@ export async function POST(req: Request) {
       // reach this device even when no tab is open. Without a KV store
       // configured, subscribing still "succeeds" — push just stays
       // client-triggered only, same as before this feature existed.
-      if (kvConfigured && ownerAddress && subscription) {
-        await addSubscription(ownerAddress, subscription);
+      let persisted = false;
+      if (kvConfigured && isAddress(ownerAddress) && isPushSubscriptionShape(subscription)) {
+        if (await checkRateLimit("subscribe", ownerAddress, 20, 300)) {
+          persisted = await addSubscription(ownerAddress, subscription);
+        }
       }
-      return NextResponse.json({ success: true, persisted: kvConfigured });
+      return NextResponse.json({ success: true, persisted });
     }
 
     if (action === "notify") {
       // Triggers a push back to the exact subscription that requested it —
       // the immediate, client-side path (fires only while a tab is open).
-      if (!subscription) {
+      if (!isPushSubscriptionShape(subscription)) {
         return NextResponse.json(
           { error: "No subscription provided" },
           { status: 400 }
         );
       }
+      // Rate-limited per endpoint (not owner — this path doesn't require one)
+      // so the test-push button can't be scripted into hammering the push
+      // service's send quota.
+      if (!(await checkRateLimit("notify", subscription.endpoint, 10, 300))) {
+        return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+      }
 
       const pushPayload = JSON.stringify({
-        title: payload?.title || "tap",
-        body: payload?.body || "New notification from tap",
+        title: String(payload?.title || "tap").slice(0, 100),
+        body: String(payload?.body || "New notification from tap").slice(0, 300),
         url: payload?.url || "/",
       });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { unregisterWatchedLink, kvConfigured } from "@/lib/server/kv";
+import { isLinkId } from "@/lib/server/validate";
 
 /**
  * Called when a link is claimed (detected client-side) or reclaimed by the
@@ -13,8 +14,8 @@ export async function POST(req: Request) {
   }
   try {
     const { linkId } = await req.json();
-    if (!linkId) {
-      return NextResponse.json({ error: "Missing linkId" }, { status: 400 });
+    if (!isLinkId(linkId)) {
+      return NextResponse.json({ error: "Invalid linkId" }, { status: 400 });
     }
     await unregisterWatchedLink(linkId);
     return NextResponse.json({ success: true });
