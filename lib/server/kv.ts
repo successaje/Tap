@@ -102,7 +102,7 @@ export async function getWatchedLinks(): Promise<WatchedLink[]> {
   );
 }
 
-export const TX_KINDS = ["send", "claim", "reclaim", "pay", "withdraw"] as const;
+export const TX_KINDS = ["send", "claim", "reclaim", "pay", "withdraw", "agentPay"] as const;
 export type TxKind = (typeof TX_KINDS)[number];
 
 const STATS_KEY = "stats:tx";

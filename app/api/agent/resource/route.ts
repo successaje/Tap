@@ -6,6 +6,7 @@ import {
   getAgentChallenge,
   consumeAgentChallenge,
   checkRateLimit,
+  recordTransaction,
   kvConfigured,
 } from "@/lib/server/kv";
 
@@ -73,6 +74,7 @@ export async function GET(req: Request) {
       );
     }
     await consumeAgentChallenge(challengeId);
+    await recordTransaction("agentPay", challenge.priceUsd);
     return NextResponse.json({
       paidWith: { transactionId: txId, amountUsd: challenge.priceUsd },
       resource: {
