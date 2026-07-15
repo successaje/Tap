@@ -6,17 +6,41 @@
 // fund it a few cents via tap's own Send screen — pay it like any other
 // recipient. Every run after that pays for and prints the demo resource.
 //
-// Env vars (same Particle project as the app; see .env.local):
+// Env vars (same Particle project as the app; see .env.local — loaded
+// automatically below, Next-style, since plain `node` doesn't do that):
 //   NEXT_PUBLIC_PARTICLE_PROJECT_ID / _CLIENT_KEY / _APP_ID
 //   AGENT_DEMO_PRIVATE_KEY   — the agent's own EOA (not your Magic login)
 //   AGENT_DEMO_BASE_URL      — default http://localhost:3000
 
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import { Wallet, Signature, getBytes } from "ethers";
 import {
   UniversalAccount,
   UNIVERSAL_ACCOUNT_VERSION,
   CHAIN_ID,
 } from "@particle-network/universal-account-sdk";
+
+function loadEnvLocal() {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  let text;
+  try {
+    text = readFileSync(join(root, ".env.local"), "utf8");
+  } catch {
+    return; // no .env.local — rely on whatever's already in the shell
+  }
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
+loadEnvLocal();
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_PARTICLE_PROJECT_ID;
 const CLIENT_KEY = process.env.NEXT_PUBLIC_PARTICLE_CLIENT_KEY;
