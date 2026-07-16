@@ -10,9 +10,9 @@ tap beyond its current product category.
 ## Part 1 — Backend infrastructure
 
 tap runs almost entirely without a backend, as described in the README's
-*Backend and data* section. One piece of server-side state exists today —
-the background push watcher below — added specifically because it could not
-be built any other way. The remaining items are not yet implemented.
+*Backend and data* section. Three pieces of server-side state exist today,
+each added specifically because it could not be built any other way — the
+remaining item is not yet implemented.
 
 ### Implemented — background push notifications
 A sender's own browser tab previously had to be open and polling for "your
@@ -28,6 +28,29 @@ transfer. Client-side detection is unchanged and still fires instantly when
 a tab is open; this only closes the gap for when one isn't. Setup
 instructions are in `.env.example`.
 
+### Implemented — referral attribution
+An earlier version of this feature was removed from the codebase rather
+than shipped with fabricated data — the Rewards screen kept promising
+"earn 500 points for every friend who sends their first link" with nothing
+behind it. It's real now: a referrer's short code (derived from their own
+address, same convention as a link id) is registered against that address
+(`app/api/referrals`); a `?ref=` code seen on landing is stashed
+client-side and captured against a brand-new account exactly once, at the
+moment it finishes onboarding — never on a returning sign-in, so an
+existing account can't retroactively generate a referral, and a
+self-referral is rejected server-side. The referrer is credited +500
+points the first time the referred account completes a real send; the
+credit call fires unconditionally on every send and correctly no-ops after
+the first time since the pending record is consumed on credit.
+
+### Implemented — real usage numbers
+Product-level statistics (`/api/stats`) — a running transaction count and
+USD volume, broken down by kind (send, claim, reclaim, pay, withdraw, and
+agent payments from the x402 proof of concept in Part 2) — recorded
+directly by application code the moment each action actually succeeds, not
+inferred from activity history. This is what backs any real traction
+numbers in the submission, rather than a manually-tallied estimate.
+
 ### 1. Cross-device activity history
 Signing in on a new device currently shows the correct balance, read live
 from the chain, but an empty activity feed, since history is stored in
@@ -35,24 +58,10 @@ from the chain, but an empty activity feed, since history is stored in
 Redis store, keyed by the user's Magic email or EOA address, resolves this
 with `localStorage` retained as a local cache. The read/write shape in
 `lib/activity.ts` requires minimal change, and the store already exists for
-the push feature above.
+the features above.
 
-### 2. Referral attribution
-Referral tracking requires a server because a referring device cannot
-observe activity on a referred device. A minimal version: a `?ref=`
-parameter writes a pending referral record keyed by referral code; when the
-referred account completes its first funded send, a webhook or the same
-scheduled job marks the referral activated and credits the referrer. An
-earlier version of this feature was removed from the codebase rather than
-shipped with fabricated data — see `lib/referrals.ts` in git history.
-
-### 3. Aggregate metrics
-Product-level statistics ("total volume moved," "links claimed") become
-meaningful once activity history is centralized (item 1), since they are an
-aggregate query over the same store rather than a separate system.
-
-Each remaining item is independently shippable and does not require changes
-to the account architecture already in production.
+This is the only backend item left, and is independently shippable without
+changes to the account architecture already in production.
 
 ---
 

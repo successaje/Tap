@@ -109,9 +109,9 @@ worker.
 | Direct pay and cash-out to any address | Live. Same Universal Account and EIP-7702 path as link transfers. |
 | Unified balance, activity feed, claim detection | Live, read directly from the chain. |
 | Push notifications | Live, including background delivery while the app is closed (see *Backend and data* below). |
-| Rewards points | Live, computed from the account's own activity volume. |
+| Rewards points | Live — the account's own activity volume plus real referral bonuses. |
+| Referral attribution | Live. A `?ref=` code is captured at first-run signup and the referrer credited on the referred account's first real send. |
 | Bank transfer / debit card cash-out | Not built. Labeled "Soon" in the interface. |
-| Referral attribution | Not built. Requires server-side tracking (see below). |
 
 ## Backend and data
 
@@ -123,28 +123,34 @@ Application state lives in three places:
   truth.
 - **`localStorage`, per device.** Session, activity history, settings, and
   outstanding-link keys — client-only, never transmitted.
-- **A small server-side store** (Upstash Redis), used for exactly one
-  purpose: letting push notifications reach a device while the app is
-  closed. When a real link is funded, its address and the sender's push
-  subscription are registered; a scheduled job (Upstash QStash, every two
-  minutes, request-signature verified) checks each outstanding link's balance
-  and pushes "your link was claimed" the moment it empties, then stops
-  watching it. Client-side detection (an open tab noticing the same thing)
-  still fires instantly and is unaffected — this closes the gap for when no
-  tab is open. Both are best-effort: a failed registration only costs a
-  missed notification, never a transfer.
+- **A small server-side store** (Upstash Redis), used for the handful of
+  things that need a shared, cross-device source of truth:
+  - **Background push.** When a real link is funded, its address and the
+    sender's push subscription are registered; a scheduled job (Upstash
+    QStash, every two minutes, request-signature verified) checks each
+    outstanding link's balance and pushes "your link was claimed" the
+    moment it empties, then stops watching it. Client-side detection (an
+    open tab noticing the same thing) still fires instantly and is
+    unaffected — this closes the gap for when no tab is open.
+  - **Referral attribution.** A referrer's short code (derived from their
+    own address) maps to that address; a `?ref=` code seen on landing is
+    captured against a brand-new account exactly once, at the moment it
+    finishes onboarding — never on a returning sign-in, so an existing
+    account can't retroactively generate a referral. The referrer is
+    credited once the referred account completes its first real send.
+  - **Real usage numbers.** A running count and USD total per transaction
+    kind, exposed at `/api/stats`, used to report genuine traction rather
+    than an estimate.
 
-This is the only server-side state in the app. It is not sufficient, on its
-own, for two related features that remain unbuilt:
+  All of the above are best-effort: a failed write only costs a missed
+  notification or an uncredited referral, never a broken transfer.
 
-- **Activity history across devices.** A new device currently shows the
-  correct balance (read from the chain) but an empty activity feed, since
-  history itself is stored locally, not in the same store as above.
-- **Referral attribution.** A referring device cannot observe activity on a
-  referred device without a shared server to correlate the two.
-
-Both are scoped out in [`FUTURE.md`](FUTURE.md), along with the full
-architecture of the background watcher above.
+The only related feature still unbuilt is **activity history across
+devices** — a new device currently shows the correct balance (read from the
+chain) but an empty activity feed, since history itself is stored locally,
+not in the store above. Scoped out in [`FUTURE.md`](FUTURE.md), along with
+the full architecture of the background watcher and the x402 agent-payment
+proof of concept.
 
 ## Track alignment
 
