@@ -8,10 +8,11 @@ import { RippleMark } from "@/components/logo";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, beginGoogleLogin, authEnabled, type AppUser } from "@/lib/auth";
 import { magicUaSigner } from "@/lib/magic";
-import { particleEnabled, transferOnArbitrum } from "@/lib/particle";
+import { particleEnabled, transferOnArbitrum, getUnifiedBalance } from "@/lib/particle";
 import { recordActivity } from "@/lib/activity";
 import { friendlyError } from "@/lib/errors";
 import { recordTransactionStat } from "@/lib/stats";
+import { DepositSheet } from "@/components/deposit-sheet";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 interface PayRequest {
@@ -33,6 +34,8 @@ export default function PayPage() {
   const [error, setError] = useState<string | null>(null);
   const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [available, setAvailable] = useState<number | null>(null);
+  const [depositOpen, setDepositOpen] = useState(false);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- post-hydration URL + storage read */
@@ -50,13 +53,19 @@ export default function PayPage() {
       note: q.get("n") || undefined,
     });
     if (amountUsd > 0) setAmount(usdToLocal(amountUsd).toFixed(2));
-    setUser(getUser());
+    const u = getUser();
+    setUser(u);
     /* eslint-enable react-hooks/set-state-in-effect */
+    if (particleEnabled && u?.address) {
+      getUnifiedBalance(u.address).then((b) => setAvailable(b?.totalUsd ?? 0));
+    }
   }, []);
 
   const numericLocal = parseFloat(amount) || 0;
   const numericUsd = localToUsd(numericLocal);
   const fixed = (req?.amountUsd ?? 0) > 0;
+  const insufficientBalance =
+    available !== null && numericUsd > 0 && available < numericUsd;
 
   async function signIn() {
     if (loggingIn) return;
@@ -167,15 +176,34 @@ export default function PayPage() {
             {!fixed && <Keypad onKey={(k) => setAmount((p) => applyKey(p, k))} />}
 
             {user ? (
-              <motion.button
-                variants={rise}
-                whileTap={{ scale: 0.96 }}
-                onClick={pay}
-                disabled={numericLocal <= 0}
-                className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-40"
-              >
-                Pay {numericLocal > 0 ? formatUsd(numericUsd) : ""}
-              </motion.button>
+              insufficientBalance ? (
+                <>
+                  <motion.p variants={rise} className="mt-3 text-center text-sm font-medium text-amber-600">
+                    You have {formatUsd(available ?? 0)} — not enough to cover this.
+                  </motion.p>
+                  <motion.button
+                    variants={rise}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => {
+                      haptic(10);
+                      setDepositOpen(true);
+                    }}
+                    className="mt-2 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
+                  >
+                    Fund your account
+                  </motion.button>
+                </>
+              ) : (
+                <motion.button
+                  variants={rise}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={pay}
+                  disabled={numericLocal <= 0}
+                  className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-40"
+                >
+                  Pay {numericLocal > 0 ? formatUsd(numericUsd) : ""}
+                </motion.button>
+              )
             ) : (
               <motion.button
                 variants={rise}
@@ -262,15 +290,34 @@ export default function PayPage() {
             </div>
             <p className="mt-5 text-lg font-semibold">Payment didn&apos;t go through</p>
             <p className="mt-2 max-w-[18rem] text-sm text-slate-500">{error}</p>
-            <button
-              onClick={() => setPhase("view")}
-              className="mt-6 h-12 rounded-full bg-accent px-8 font-semibold text-white"
-            >
-              Try again
-            </button>
+            <div className="mt-6 flex items-center gap-3">
+              {error?.includes("Not enough balance") && (
+                <button
+                  onClick={() => {
+                    haptic(10);
+                    setDepositOpen(true);
+                  }}
+                  className="h-12 rounded-full border border-slate-200 px-6 font-semibold text-slate-700"
+                >
+                  Fund your account
+                </button>
+              )}
+              <button
+                onClick={() => setPhase("view")}
+                className="h-12 rounded-full bg-accent px-8 font-semibold text-white"
+              >
+                Try again
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DepositSheet
+        open={depositOpen}
+        onClose={() => setDepositOpen(false)}
+        address={user?.address ?? null}
+      />
     </main>
   );
 }
