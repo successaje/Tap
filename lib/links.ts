@@ -11,6 +11,7 @@
 import { getUser } from "@/lib/store";
 import { magicUaSigner } from "@/lib/magic";
 import { recordTransactionStat } from "@/lib/stats";
+import { creditReferralIfPending } from "@/lib/referrals";
 import {
   particleEnabled,
   transferOnArbitrum,
@@ -116,6 +117,10 @@ export async function createFundedLink(
     magicUaSigner()
   );
   recordTransactionStat("send", receipt.sentUsd);
+  // "Sends their first link" — the exact event Rewards promises 500 points
+  // for. Unconditional on every send; no-ops after the first real credit
+  // since the pending record is consumed server-side.
+  creditReferralIfPending(user.address);
 
   const id = ephemeral.address.slice(2, 10).toLowerCase();
   const params = new URLSearchParams({

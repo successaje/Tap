@@ -161,3 +161,68 @@ export async function consumeAgentChallenge(id: string): Promise<void> {
   if (!redis) return;
   await redis.del(AGENT_CHALLENGE_KEY(id));
 }
+
+const REFERRAL_BONUS_POINTS = 500;
+const REFERRAL_CODE_KEY = (code: string) => `referral:code:${code}`;
+const REFERRAL_PENDING_KEY = (referredAddress: string) =>
+  `referral:pending:${referredAddress.toLowerCase()}`;
+const REFERRAL_POINTS_KEY = (referrerAddress: string) =>
+  `referral:points:${referrerAddress.toLowerCase()}`;
+
+/** Registers a referrer's short code → their address, so a later signup can resolve it. */
+export async function linkReferralCode(code: string, referrerAddress: string) {
+  if (!redis) return;
+  await redis.set(REFERRAL_CODE_KEY(code), referrerAddress.toLowerCase());
+}
+
+/**
+ * Records "this address was referred by whoever owns this code" — pending,
+ * not yet credited. Only meant to be called once, right when a brand-new
+ * account finishes onboarding (see components/onboarding.tsx), so an
+ * existing user clicking a stray `?ref=` link later can't retroactively
+ * generate a referral. Silently declines a self-referral or a second
+ * capture for the same address (first one wins).
+ */
+export async function capturePendingReferral(
+  referredAddress: string,
+  code: string
+): Promise<boolean> {
+  if (!redis) return false;
+  const referrerAddress = await redis.get<string>(REFERRAL_CODE_KEY(code));
+  if (!referrerAddress || referrerAddress === referredAddress.toLowerCase()) {
+    return false;
+  }
+  const key = REFERRAL_PENDING_KEY(referredAddress);
+  const existing = await redis.get(key);
+  if (existing) return false;
+  await redis.set(key, referrerAddress);
+  return true;
+}
+
+/**
+ * Credits the referrer +500 points the first time the referred address
+ * completes a real send — called from lib/links.ts right after that
+ * succeeds. The pending record is deleted on credit, so calling this again
+ * on every subsequent send (which does happen — it's unconditional in
+ * createFundedLink) correctly no-ops instead of double-crediting.
+ */
+export async function creditReferralIfPending(referredAddress: string): Promise<boolean> {
+  if (!redis) return false;
+  const key = REFERRAL_PENDING_KEY(referredAddress);
+  const referrerAddress = await redis.get<string>(key);
+  if (!referrerAddress) return false;
+  await redis.del(key);
+  await redis.hincrby(REFERRAL_POINTS_KEY(referrerAddress), "points", REFERRAL_BONUS_POINTS);
+  await redis.hincrby(REFERRAL_POINTS_KEY(referrerAddress), "count", 1);
+  return true;
+}
+
+export async function getReferralStats(
+  address: string
+): Promise<{ points: number; count: number }> {
+  if (!redis) return { points: 0, count: 0 };
+  const data = await redis.hgetall<Record<string, string | number>>(
+    REFERRAL_POINTS_KEY(address)
+  );
+  return { points: Number(data?.points ?? 0), count: Number(data?.count ?? 0) };
+}

@@ -22,3 +22,9 @@ export function sanitizeNote(note: unknown): string | undefined {
 
 export const isTxKind = (v: unknown): v is TxKind =>
   typeof v === "string" && (TX_KINDS as readonly string[]).includes(v);
+
+// Same shape as isLinkId (8 lowercase hex chars) but a distinct referral-code
+// concept — kept as its own name so a future change to one doesn't silently
+// affect the other just because the regex happens to match today.
+export const isReferralCode = (v: unknown): v is string =>
+  typeof v === "string" && /^[0-9a-f]{8}$/.test(v);

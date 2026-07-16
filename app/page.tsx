@@ -9,6 +9,7 @@ import { Splash } from "@/components/splash";
 import { getUser, hasPendingResume } from "@/lib/auth";
 import { isOnboarded, markOnboarded, type MockUser } from "@/lib/store";
 import { demoLink } from "@/lib/mock";
+import { stashPendingReferralCode, capturePendingReferral } from "@/lib/referrals";
 
 type View = "loading" | "landing" | "demo" | "onboarding" | "home";
 
@@ -27,6 +28,11 @@ export default function Root() {
   const [user, setUser] = useState<MockUser | null>(null);
 
   useEffect(() => {
+    // Stash a `?ref=` code the instant it's seen — before any sign-in
+    // redirect — so it survives the round trip to Google and back.
+    const refCode = new URLSearchParams(window.location.search).get("ref");
+    if (refCode) stashPendingReferralCode(refCode);
+
     // Post-hydration storage reads (SSR can't see them).
     /* eslint-disable react-hooks/set-state-in-effect */
     const u = getUser();
@@ -60,6 +66,7 @@ export default function Root() {
           user={user}
           onDone={() => {
             markOnboarded();
+            if (user?.address) capturePendingReferral(user.address);
             window.dispatchEvent(new Event("tap:auth"));
             setView("home");
           }}

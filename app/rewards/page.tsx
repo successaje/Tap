@@ -7,6 +7,7 @@ import { Copy, Gift, Share2, ArrowLeft } from "lucide-react";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser } from "@/lib/auth";
 import { getActivity } from "@/lib/activity";
+import { linkReferralCode, getReferralStats } from "@/lib/referrals";
 
 // Points are earned from real money moved through tap — 100 per $1 — so the
 // number reflects what you've actually done, not a hardcoded figure.
@@ -21,20 +22,34 @@ const TIERS = [
 
 export default function RewardsPage() {
   const router = useRouter();
-  const [points, setPoints] = useState(0);
+  const [ownPoints, setOwnPoints] = useState(0);
+  const [referralPoints, setReferralPoints] = useState(0);
+  const [referredCount, setReferredCount] = useState(0);
   const [refCode, setRefCode] = useState("you");
   // Host starts as the brand default so the first client render matches SSR;
   // the effect swaps in the real host to avoid a hydration mismatch.
   const [host, setHost] = useState("");
   const [copied, setCopied] = useState(false);
+  const points = ownPoints + referralPoints;
 
   /* eslint-disable react-hooks/set-state-in-effect -- post-hydration reads */
   useEffect(() => {
     const volume = getActivity().reduce((sum, a) => sum + Math.abs(a.amountUsd), 0);
-    setPoints(Math.round(volume * PER_USD));
+    setOwnPoints(Math.round(volume * PER_USD));
     setHost(window.location.host);
     const u = getUser();
-    if (u) setRefCode((u.name?.split(" ")[0] || u.email?.split("@")[0] || "you").toLowerCase());
+    if (u?.address) {
+      // Same 8-hex-char convention lib/links.ts uses for link ids — short,
+      // and derived from the address itself so it can't collide the way a
+      // name-based code could between two people named the same thing.
+      const code = u.address.slice(2, 10).toLowerCase();
+      setRefCode(code);
+      linkReferralCode(code, u.address);
+      getReferralStats(u.address).then(({ points, count }) => {
+        setReferralPoints(points);
+        setReferredCount(count);
+      });
+    }
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -124,7 +139,16 @@ export default function RewardsPage() {
         <p className="mt-3 text-left text-xs font-semibold text-slate-400">
           {points === 0
             ? "Send or claim your first payment to start earning."
-            : `Earned from $${(points / PER_USD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} moved through tap`}
+            : [
+                ownPoints > 0
+                  ? `Earned from $${(ownPoints / PER_USD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} moved through tap`
+                  : null,
+                referredCount > 0
+                  ? `${referredCount} friend${referredCount === 1 ? "" : "s"} invited (+${referralPoints.toLocaleString()} pts)`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
         </p>
       </motion.div>
 
