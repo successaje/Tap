@@ -9,10 +9,11 @@ import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, beginGoogleLogin, authEnabled, type AppUser } from "@/lib/auth";
 import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum, getUnifiedBalance } from "@/lib/particle";
-import { recordActivity } from "@/lib/activity";
+import { recordActivity, type ActivityItem } from "@/lib/activity";
 import { friendlyError } from "@/lib/errors";
 import { recordTransactionStat } from "@/lib/stats";
 import { DepositSheet } from "@/components/deposit-sheet";
+import { ReceiptSheet } from "@/components/receipt-sheet";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 
 interface PayRequest {
@@ -32,10 +33,11 @@ export default function PayPage() {
   const [amount, setAmount] = useState("0");
   const [phase, setPhase] = useState<Phase>("view");
   const [error, setError] = useState<string | null>(null);
-  const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
   const [available, setAvailable] = useState<number | null>(null);
   const [depositOpen, setDepositOpen] = useState(false);
+  const [receiptItem, setReceiptItem] = useState<ActivityItem | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- post-hydration URL + storage read */
@@ -97,7 +99,7 @@ export default function PayPage() {
         // Mock fallback keeps the flow demoable without credentials.
         await new Promise((r) => setTimeout(r, 1400));
       }
-      recordActivity({
+      const recorded = recordActivity({
         type: "sent",
         kind: "direct",
         amountUsd: numericUsd,
@@ -106,7 +108,7 @@ export default function PayPage() {
         status: "settled",
         explorerUrl: url ?? undefined,
       });
-      setExplorerUrl(url);
+      setReceiptItem(recorded);
       haptic([0, 30, 40, 60]);
       setPhase("paid");
     } catch (err) {
@@ -260,15 +262,16 @@ export default function PayPage() {
               Paid {formatUsd(numericUsd)}
             </p>
             <p className="mt-1 text-slate-500">to {req.from}</p>
-            {explorerUrl && (
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noreferrer"
+            {receiptItem && (
+              <button
+                onClick={() => {
+                  haptic(10);
+                  setReceiptOpen(true);
+                }}
                 className="mt-2 text-sm font-medium text-accent underline-offset-2 hover:underline"
               >
-                View the on-chain receipt ↗
-              </a>
+                View receipt
+              </button>
             )}
             <button
               onClick={() => router.push("/")}
@@ -318,6 +321,11 @@ export default function PayPage() {
         open={depositOpen}
         onClose={() => setDepositOpen(false)}
         address={user?.address ?? null}
+      />
+      <ReceiptSheet
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        activity={receiptItem}
       />
     </main>
   );

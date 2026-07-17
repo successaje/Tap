@@ -11,8 +11,8 @@ import { RippleMark } from "@/components/logo";
 import { addToBalance, getBalance } from "@/lib/store";
 import { authEnabled, consumeReturnStep, getUser } from "@/lib/auth";
 import { claimFundedLink } from "@/lib/links";
-import { recordActivity } from "@/lib/activity";
-import { particleEnabled, type TransferReceipt } from "@/lib/particle";
+import { recordActivity, type ActivityItem } from "@/lib/activity";
+import { particleEnabled } from "@/lib/particle";
 import type { PaymentLink } from "@/lib/mock";
 
 type Step = "claim" | "login" | "moment" | "success" | "send";
@@ -34,7 +34,7 @@ export function Flow({
   const [step, setStep] = useState<Step>("claim");
   const [link, setLink] = useState<PaymentLink>(initialLink);
   const [balance, setBalance] = useState(0);
-  const [receipt, setReceipt] = useState<TransferReceipt | null>(null);
+  const [receiptItem, setReceiptItem] = useState<ActivityItem | null>(null);
   // With real auth, wait one tick to check for a redirect return before
   // painting — avoids flashing the claim screen before jumping to the moment.
   const [ready, setReady] = useState(!authEnabled);
@@ -109,7 +109,6 @@ export function Flow({
               setLink((l) => ({ ...l, status: "claimed" }));
               if (r) {
                 // Real claim: the money moved on-chain.
-                setReceipt(r);
                 setBalance(r.sentUsd);
               } else {
                 addToBalance(link.amountUsd);
@@ -120,7 +119,7 @@ export function Flow({
               // in pure-mock environments (no Particle keys) it still records
               // so the app feels alive.
               if (r || !particleEnabled) {
-                recordActivity({
+                const recorded = recordActivity({
                   type: "received",
                   kind: "link",
                   amountUsd: r?.sentUsd ?? link.amountUsd,
@@ -133,6 +132,7 @@ export function Flow({
                   // "you already claimed this" apart from "someone else did."
                   linkId: link.id,
                 });
+                setReceiptItem(recorded);
               }
               setStep("success");
             }}
@@ -143,7 +143,7 @@ export function Flow({
           <SuccessScreen
             key="success"
             balance={balance}
-            explorerUrl={receipt?.explorerUrl}
+            receiptItem={receiptItem}
             onSend={() => setStep("send")}
           />
         )}

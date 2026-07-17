@@ -11,22 +11,25 @@ import { markOnboarded } from "@/lib/store";
 import { getUnifiedBalance, type UnifiedBalance } from "@/lib/particle";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings } from "@/lib/settings";
+import { ReceiptSheet } from "@/components/receipt-sheet";
+import type { ActivityItem } from "@/lib/activity";
 
 /** (d) Success — balance confirmed + optional "add to home screen" prompt. */
 export function SuccessScreen({
   balance,
-  explorerUrl,
+  receiptItem,
   onSend,
 }: {
   balance: number;
-  /** Set when the claim really settled on-chain. */
-  explorerUrl?: string;
+  /** Present for real claims — lets this screen show the same branded receipt as Home. */
+  receiptItem?: ActivityItem | null;
   onSend: () => void;
 }) {
   const router = useRouter();
   const { canInstall, installed, promptInstall } = useInstallPrompt();
   const [dismissed, setDismissed] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const [unified, setUnified] = useState<UnifiedBalance | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
@@ -139,16 +142,17 @@ export function SuccessScreen({
           Yours to spend or send. Settled on-chain — you&apos;d never know.
         </motion.p>
 
-        {explorerUrl && (
-          <motion.a
+        {receiptItem && (
+          <motion.button
             variants={rise}
-            href={explorerUrl}
-            target="_blank"
-            rel="noreferrer"
+            onClick={() => {
+              haptic(10);
+              setReceiptOpen(true);
+            }}
             className="mt-2 text-sm font-medium text-accent underline-offset-2 hover:underline"
           >
-            View the on-chain receipt ↗
-          </motion.a>
+            View receipt
+          </motion.button>
         )}
 
         <AnimatePresence>
@@ -230,6 +234,12 @@ export function SuccessScreen({
           Go to my balance
         </button>
       </motion.div>
+
+      <ReceiptSheet
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        activity={receiptItem ?? null}
+      />
     </Screen>
   );
 }

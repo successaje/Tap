@@ -9,9 +9,10 @@ import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
 import { magicUaSigner } from "@/lib/magic";
 import { particleEnabled, transferOnArbitrum, getUnifiedBalance } from "@/lib/particle";
-import { recordActivity } from "@/lib/activity";
+import { recordActivity, type ActivityItem } from "@/lib/activity";
 import { friendlyError } from "@/lib/errors";
 import { recordTransactionStat } from "@/lib/stats";
+import { ReceiptSheet } from "@/components/receipt-sheet";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 import { Landmark, CreditCard, Wallet, Check, X, ArrowLeft, ClipboardPaste } from "lucide-react";
 
@@ -28,7 +29,8 @@ export default function WithdrawPage() {
   const [dest, setDest] = useState("");
   const [amount, setAmount] = useState("0");
   const [error, setError] = useState<string | null>(null);
-  const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
+  const [receiptItem, setReceiptItem] = useState<ActivityItem | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- post-hydration reads */
@@ -81,7 +83,7 @@ export default function WithdrawPage() {
       } else {
         await new Promise((r) => setTimeout(r, 1400)); // mock fallback
       }
-      recordActivity({
+      const recorded = recordActivity({
         type: "sent",
         kind: "withdrawal",
         amountUsd: numericUsd,
@@ -91,7 +93,7 @@ export default function WithdrawPage() {
         explorerUrl: url ?? undefined,
       });
       haptic([0, 30, 40, 60]);
-      setExplorerUrl(url);
+      setReceiptItem(recorded);
       setPhase("sent");
     } catch (err) {
       console.error("[tap:withdraw] send error:", err);
@@ -346,15 +348,16 @@ export default function WithdrawPage() {
             <p className="mt-1 font-mono text-sm text-slate-500">
               to {shorten(dest.trim())}
             </p>
-            {explorerUrl && (
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noreferrer"
+            {receiptItem && (
+              <button
+                onClick={() => {
+                  haptic(10);
+                  setReceiptOpen(true);
+                }}
                 className="mt-2 text-sm font-medium text-accent underline-offset-2 hover:underline"
               >
-                View the on-chain receipt ↗
-              </a>
+                View receipt
+              </button>
             )}
             <motion.button
               whileTap={{ scale: 0.97 }}
@@ -392,6 +395,12 @@ export default function WithdrawPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ReceiptSheet
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        activity={receiptItem}
+      />
     </main>
   );
 }
