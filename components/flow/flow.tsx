@@ -73,7 +73,18 @@ export function Flow({
           <ClaimScreen
             key="claim"
             link={link}
-            onContinue={() => setStep("login")}
+            onContinue={() => {
+              // Already have a session? Skip straight to the claim moment —
+              // no reason to send someone through a fresh Google round trip
+              // just because they opened a different link.
+              const user = getUser();
+              if (authEnabled && user) {
+                setLink((l) => ({ ...l, status: "bound", boundTo: user.email }));
+                setStep("moment");
+              } else {
+                setStep("login");
+              }
+            }}
           />
         )}
 
@@ -117,6 +128,9 @@ export function Flow({
                   status: "settled",
                   explorerUrl: r?.explorerUrl,
                   txId: r?.transactionId,
+                  // Lets a later visit to this same (now-emptied) link tell
+                  // "you already claimed this" apart from "someone else did."
+                  linkId: link.id,
                 });
               }
               setStep("success");

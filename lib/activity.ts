@@ -66,6 +66,11 @@ export function updateActivityByLinkId(
   window.localStorage.setItem(KEY, JSON.stringify(list));
 }
 
+/** Did *this device* record itself as the one who claimed this link? */
+export function hasReceivedLink(linkId: string): boolean {
+  return getActivity().some((a) => a.type === "received" && a.linkId === linkId);
+}
+
 /**
  * One-time cleanup: earlier builds let the "see how claiming works" demo write
  * its fake $42.50-from-Maya into real history. Remove anything matching that

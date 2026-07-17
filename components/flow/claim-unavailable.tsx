@@ -31,13 +31,23 @@ export function ClaimUnavailable({
   reason,
   amountUsd,
   senderName,
+  claimedByYou,
 }: {
   reason: Reason;
   amountUsd?: number;
   senderName?: string;
+  /** True only when this device's own activity shows it claimed this link. */
+  claimedByYou?: boolean;
 }) {
   const router = useRouter();
-  const c = copy[reason];
+  const c =
+    reason === "claimed" && claimedByYou
+      ? {
+          emoji: "✅",
+          title: "You already claimed this",
+          body: "It's already in your activity — check Home for the receipt.",
+        }
+      : copy[reason];
 
   return (
     <motion.main
@@ -74,7 +84,7 @@ export function ClaimUnavailable({
           {c.title}
         </motion.h1>
         <motion.p variants={rise} className="mt-2 max-w-[17rem] text-sm text-slate-500">
-          {senderName && reason === "claimed"
+          {senderName && reason === "claimed" && !claimedByYou
             ? `The ${formatUsd(amountUsd ?? 0)} from ${senderName} is already spoken for. `
             : ""}
           {c.body}

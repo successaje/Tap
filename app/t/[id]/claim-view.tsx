@@ -5,6 +5,7 @@ import { Flow } from "@/components/flow/flow";
 import { ClaimUnavailable } from "@/components/flow/claim-unavailable";
 import { parseClaimLink, getLinkBalance, type ClaimableLink } from "@/lib/links";
 import { particleEnabled } from "@/lib/particle";
+import { hasReceivedLink } from "@/lib/activity";
 import type { PaymentLink } from "@/lib/mock";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -70,6 +71,10 @@ export function ClaimView({ id }: { id: string }) {
         reason="claimed"
         amountUsd={link.payment.amountUsd}
         senderName={link.payment.senderName}
+        // Only ever true from local evidence on this exact device — a
+        // different device claiming the same link has no way to know that
+        // here, so it falls back to the generic "someone" copy, correctly.
+        claimedByYou={hasReceivedLink(link.payment.id)}
       />
     );
   }
