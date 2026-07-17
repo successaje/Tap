@@ -185,16 +185,6 @@ on mock data. Each integration activates independently once its keys are
 present; an invalid or missing VAPID key disables push without affecting the
 rest of the application.
 
-## Deployment (Vercel)
-
-1. Import the repository at [vercel.com/new](https://vercel.com/new) — the
-   framework is auto-detected.
-2. Add the environment variables above under **Settings → Environment
-   Variables**.
-3. After the first deploy, add the production origin plus `/callback` to the
-   Magic dashboard's redirect allowlist, and the production origin to the
-   Particle app's allowed origins.
-
 ## Tech stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
