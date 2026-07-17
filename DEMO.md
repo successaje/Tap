@@ -32,8 +32,10 @@ balance**, "5 chains underneath."
 - Tap to claim → **sign in with Google** (no wallet, no seed phrase — call it
   out). Return to the claim screen.
 - Tap the big target → ripple from the touch point → **"Landing your money…
-  settling on Arbitrum"** → the amount **counts up** and lands. Tap the
-  **on-chain receipt** to prove it's real.
+  settling on Arbitrum"** → the amount **counts up** and lands. Tap **"View
+  receipt"** — a real, tap-branded receipt appears (amount, from, date,
+  network), not a blockchain explorer. "Verify on Arbitrum" sits one tap
+  further down for anyone who wants to check the chain themselves.
 
 **0:55 – 1:15 · Why it matters**
 - Recipient is now on Home with their **own one balance**. "They just received
@@ -42,8 +44,8 @@ balance**, "5 chains underneath."
 
 **1:15 – 1:30 · Trust + close**
 - Back on Sender: open **Settings → reclaim** an unclaimed link (or show the
-  activity feed with receipts). "If they never claim it, I pull it back. Real
-  money, real safety rails."
+  activity feed — tapping any row opens the same branded receipt). "If they
+  never claim it, I pull it back. Real money, real safety rails."
 - Close: **"Peanut proved you can send crypto with a link. tap makes it not feel
   like crypto at all — one balance, one login, settled on Arbitrum. That's the
   Universal Account."**
@@ -53,11 +55,11 @@ balance**, "5 chains underneath."
 ## If you only have 60 seconds
 Cut the reclaim beat (1:15–1:30) and the Send-side funding detail; keep
 **Home → create link → claim on device 2 → Google login → count-up landing →
-on-chain receipt.** That sequence alone hits UX, Magic, Particle UA, and
-Arbitrum.
+receipt.** That sequence alone hits UX, Magic, Particle UA, and Arbitrum.
 
 ## Lines that land with judges
 - "The user's Google account *is* the wallet — no new address, upgraded in place with 7702."
 - "One balance. They never think about a chain."
 - "Settled on Arbitrum — the recipient never needed gas there, or anywhere."
+- "Even the receipt looks like a receipt — not a wall of transaction hashes."
 - "Every screen you saw works on mock data too — but that was all real money."
