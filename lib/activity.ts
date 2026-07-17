@@ -6,10 +6,13 @@
 
 export type ActivityType = "sent" | "received" | "reclaimed";
 export type ActivityStatus = "settled" | "awaiting-claim" | "reclaimed";
+/** How the money moved — drives the receipt's copy and layout. */
+export type ActivityKind = "link" | "direct" | "withdrawal";
 
 export interface ActivityItem {
   id: string;
   type: ActivityType;
+  kind: ActivityKind;
   amountUsd: number;
   /** Who the money moved to/from, as displayed ("Maya", "Link 4f2a…"). */
   counterparty: string;

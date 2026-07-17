@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { SupportSheet } from "@/components/support-sheet";
+import { ReceiptSheet } from "@/components/receipt-sheet";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
@@ -37,6 +38,7 @@ export function Home() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [receiptItem, setReceiptItem] = useState<ActivityItem | null>(null);
 
   // Re-run everything that can change: balance, activity, and claim
   // detection. Shared by first mount and pull-to-refresh so there's exactly
@@ -245,14 +247,14 @@ export function Home() {
           <ul className="mt-4 space-y-1">
             {activity.slice(0, 12).map((a) => {
               const meta = typeMeta[a.type];
-              const Row = a.explorerUrl ? "a" : "div";
               return (
                 <li key={a.id}>
-                  <Row
-                    {...(a.explorerUrl
-                      ? { href: a.explorerUrl, target: "_blank", rel: "noreferrer" }
-                      : {})}
-                    className="flex items-center gap-4 rounded-2xl bg-white px-3 py-3 hover:bg-slate-50"
+                  <button
+                    onClick={() => {
+                      haptic(10);
+                      setReceiptItem(a);
+                    }}
+                    className="flex w-full items-center gap-4 rounded-2xl bg-white px-3 py-3 text-left hover:bg-slate-50"
                   >
                     <span
                       className={`flex size-10 shrink-0 items-center justify-center rounded-full ${meta.tint}`}
@@ -286,7 +288,7 @@ export function Home() {
                       {meta.sign}
                       {settings.hideBalance ? "••••" : formatCurrency(a.amountUsd, settings.currency, rates)}
                     </span>
-                  </Row>
+                  </button>
                 </li>
               );
             })}
@@ -297,6 +299,12 @@ export function Home() {
       <SupportSheet
         open={supportOpen}
         onClose={() => setSupportOpen(false)}
+      />
+
+      <ReceiptSheet
+        open={!!receiptItem}
+        onClose={() => setReceiptItem(null)}
+        activity={receiptItem}
       />
 
       <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-30 h-32 bg-gradient-to-t from-white to-transparent" />

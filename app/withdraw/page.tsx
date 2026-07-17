@@ -83,6 +83,7 @@ export default function WithdrawPage() {
       }
       recordActivity({
         type: "sent",
+        kind: "withdrawal",
         amountUsd: numericUsd,
         counterparty: shorten(dest.trim()),
         note: "sent to address",

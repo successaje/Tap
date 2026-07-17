@@ -99,6 +99,7 @@ export default function PayPage() {
       }
       recordActivity({
         type: "sent",
+        kind: "direct",
         amountUsd: numericUsd,
         counterparty: req.from,
         note: req.note,

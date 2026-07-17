@@ -79,6 +79,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       setShareUrl(`${window.location.origin}/t/${mock.id}`);
       recordActivity({
         type: "sent",
+        kind: "link",
         amountUsd: numericUsd,
         counterparty: "Payment link",
         note: note.trim() || undefined,
@@ -97,6 +98,7 @@ export function SendScreen({ onClose }: { onClose: () => void }) {
       setExplorerUrl(link.explorerUrl);
       recordActivity({
         type: "sent",
+        kind: "link",
         amountUsd: numericUsd,
         counterparty: "Payment link",
         note: note.trim() || undefined,

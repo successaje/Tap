@@ -122,6 +122,7 @@ export function Flow({
               if (r || !particleEnabled) {
                 recordActivity({
                   type: "received",
+                  kind: "link",
                   amountUsd: r?.sentUsd ?? link.amountUsd,
                   counterparty: link.senderName,
                   note: link.note,

@@ -71,11 +71,13 @@ export default function ProfilePage() {
       const receipt = await reclaimFundedLink(link.id);
       recordActivity({
         type: "reclaimed",
+        kind: "link",
         amountUsd: receipt.sentUsd,
         counterparty: `Link ${link.id.slice(0, 6)}`,
         status: "reclaimed",
         explorerUrl: receipt.explorerUrl,
         txId: receipt.transactionId,
+        linkId: link.id,
       });
       setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed));
       haptic([0, 25, 30, 40]);
