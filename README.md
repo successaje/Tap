@@ -27,7 +27,7 @@ a testnet simulation.
 
 ## Positioning: tap vs. Peanut Protocol
 
-tap and [Peanut Protocol](https://peanut.to) address the same category:
+[tap](https://tap-xyz.vercel.app) and [Peanut Protocol](https://peanut.to) address the same category:
 link-based crypto transfer with no wallet required to receive. Peanut is the
 more established project in this category — live across 30+ chains and
 featured in Arbitrum's own ecosystem. The distinction between the two
