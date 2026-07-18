@@ -280,7 +280,30 @@ export async function reclaimFundedLink(
 ): Promise<TransferReceipt> {
   const record = getSentLinks().find((l) => l.id === linkId);
   if (!record) throw new Error("Link not found on this device");
-  const receipt = await claimFundedLink(record.privateKey);
+  let receipt: TransferReceipt;
+  try {
+    receipt = await claimFundedLink(record.privateKey);
+  } catch (err) {
+    // An empty wallet here means someone claimed the link between the last
+    // sync and this reclaim attempt. Record that (same bookkeeping as
+    // syncSentLinkClaims) so the link stops showing as reclaimable, then
+    // rethrow so the UI can still explain what happened. Matching our own
+    // error message from sweepAllToAddress — not an external SDK string.
+    if (err instanceof Error && /empty/i.test(err.message)) {
+      window.localStorage.setItem(
+        SENT_KEY,
+        JSON.stringify(
+          getSentLinks().map((l) =>
+            l.id === linkId ? { ...l, claimed: true } : l
+          )
+        )
+      );
+      unregisterLinkForPush(linkId);
+      const { updateActivityByLinkId } = await import("@/lib/activity");
+      updateActivityByLinkId(linkId, { status: "settled" });
+    }
+    throw err;
+  }
   recordTransactionStat("reclaim", receipt.sentUsd);
   unregisterLinkForPush(linkId); // reclaimed, not claimed — no push should fire
   window.localStorage.setItem(

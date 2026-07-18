@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { springs, stagger, rise, haptic } from "@/lib/motion";
 import { getUser, logout, type AppUser } from "@/lib/auth";
-import { getSentLinks, reclaimFundedLink, type SentLinkRecord } from "@/lib/links";
+import { getSentLinks, reclaimFundedLink, syncSentLinkClaims, type SentLinkRecord } from "@/lib/links";
 import { recordActivity, timeAgo } from "@/lib/activity";
 import { formatCurrency, getExchangeRates, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { getSettings, updateSettings, type Settings as UserSettings } from "@/lib/settings";
@@ -57,6 +57,14 @@ export default function ProfilePage() {
     setSettings(getSettings());
     getExchangeRates().then(setRates);
     isSubscribed().then(setPushEnabled);
+    // The local records only learn a link was claimed when something re-checks
+    // the chain — that used to happen only on Home, so a link claimed since
+    // the last Home visit kept showing here as reclaimable. Re-check on entry.
+    syncSentLinkClaims()
+      .then(() =>
+        setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed))
+      )
+      .catch(() => {});
     const handleSettings = () => setSettings(getSettings());
     window.addEventListener("tap:settings", handleSettings);
     return () => window.removeEventListener("tap:settings", handleSettings);
@@ -91,6 +99,9 @@ export default function ProfilePage() {
               ? err.message
               : String(err),
       }));
+      // reclaimFundedLink marks the record claimed when the wallet turned out
+      // to be empty — re-read so the stale row drops instead of lingering.
+      setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed));
     } finally {
       setBusyId(null);
     }
