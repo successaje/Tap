@@ -89,6 +89,61 @@ never needs gas on any chain. Unclaimed links can be reclaimed by the sender
 at any time (Profile → Outstanding links), using the same sweep mechanism in
 reverse.
 
+### How this was built
+
+The UI and interaction model were mocked first, in full, before any real
+integration existed — every screen was demoable on day one. Each mocked seam
+was then replaced with a real one, one at a time: Magic login, then Particle
+Universal Account creation, then real cross-chain transfers, so the product
+never had a broken middle state. Once the core loop was real, three
+disciplined passes followed rather than more features: a security pass
+(input validation and rate limiting on every server endpoint, once
+background push introduced the first server-side state this app has ever
+had), a UI pass that found and fixed raw SDK/RPC errors leaking into the
+interface across all four money-movement flows, and continuous live-money
+verification — every claim documented in this README was checked against a
+real transaction on Arbitrum mainnet, not asserted from reading the code.
+
+### Why this matters
+
+**To users.** The wallet — not the blockchain underneath it — is what stops
+someone who has never touched crypto from receiving a crypto payment. tap
+removes it rather than making it prettier: a Google login is not a UI
+convenience layered on top of a wallet, it *is* the account, so there is
+nothing separate to install, secure, or lose.
+
+**To web3.** Chain abstraction and account abstraction are usually discussed
+as infrastructure — a smoother RPC layer, a better SDK. tap is one answer to
+what they produce when carried all the way to a finished product a
+non-crypto person can actually use: an app where the honest end state is
+"wait, that's crypto?" instead of "cool, a blockchain app."
+
+**To UXmaxx.** This hackathon's premise is that user experience, not another
+protocol, is what's been missing from web3 adoption. tap is a direct,
+literal answer to that premise rather than a UX skin on an existing crypto
+flow — every design decision in this README, from the receipt screen to the
+error copy, was made against that one standard.
+
+**To Particle.** tap is a non-trivial proof that Universal Accounts in
+EIP-7702 mode can carry a complete consumer product end to end, not a demo
+wallet — real send, claim, pay, withdraw, and agent-payment flows, with the
+delegation authorization signed invisibly on a user's first transaction.
+It's evidence for the EIP-7702 thesis at the product layer, not just the
+SDK layer.
+
+**To Magic.** Headless 7702 authorization signing
+(`magic.wallet.sign7702Authorization()`) combined with Google login is the
+exact mechanism that makes "signing in" and "having an account" the same
+event instead of an aspiration. tap exercises that specific capability
+under real, repeated transaction load, not a single demo call.
+
+**To Arbitrum.** Every dollar moved in this project settled there,
+invisibly — the precise "the user doesn't need to know or care which L2"
+experience Arbitrum's own ecosystem narrative is aiming for. The real
+transaction counter at [`/api/stats`](https://tap-xyz.vercel.app/api/stats)
+is verifiable evidence of genuine mainnet settlement activity, not a
+testnet count.
+
 ## Product surface
 
 | Surface | Route | Description |
