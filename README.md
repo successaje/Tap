@@ -161,7 +161,7 @@ proof of concept.
 
 ## Judging criteria
 
-**UX excellence (40%).** The product is built around removing steps, not
+**UX excellence** The product is built around removing steps, not
 adding features to hide them. Google sign-in is the only onboarding
 action — there is no wallet screen, no network picker, no gas step, ever.
 Every claim, send, and pay flow was tested end-to-end with real USDC on
@@ -170,7 +170,7 @@ errors leaking into the UI across all four money-movement flows — a real
 bug, not a polish nit, since it directly contradicted the product's own
 premise (see [`lib/errors.ts`](lib/errors.ts)).
 
-**Prominent, innovative use of Universal Accounts + EIP-7702 (30%).** This
+**Prominent, innovative use of Universal Accounts + EIP-7702** This
 isn't an integration added to an existing product — the Universal Account
 *is* the product. `useEIP7702: true` upgrades the Magic-issued EOA in
 place, including signing its own delegation authorization headlessly
@@ -180,7 +180,7 @@ cash-out, and an agent-to-agent x402 payment
 ([`scripts/agent-demo.mjs`](scripts/agent-demo.mjs)) — the same account,
 the same primitives, paying a machine instead of a human.
 
-**Adoption potential (20%).** tap targets people who don't have a wallet
+**Adoption potential** tap targets people who don't have a wallet
 and don't want one — a larger audience than link-payment products aimed at
 crypto-native users. A real transaction counter at
 [`/api/stats`](https://tap-xyz.vercel.app/api/stats) backs this with actual
@@ -189,7 +189,7 @@ application code the moment a real transfer succeeds, nothing estimated.
 Referral attribution, background push notifications, and a rewards system
 are real, working retention mechanisms, not placeholders.
 
-**Technical quality and polish (10%).** A dedicated security pass added
+**Technical quality and polish** A dedicated security pass added
 input validation and rate limiting to every server endpoint
 ([`lib/server/validate.ts`](lib/server/validate.ts),
 [`lib/server/kv.ts`](lib/server/kv.ts)). Every screen uses spring-based
