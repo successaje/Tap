@@ -265,6 +265,42 @@
   }
   .arch-step:last-child .arrow { display: none; }
 
+  /* ---------- agent-to-agent (x402) ---------- */
+  /* Deliberately not a phone card, unlike every step above — there is no
+     screen for this transaction. That absence is the point: a machine
+     paid a machine, no human, no UI, on the same account primitives. */
+  .agent { padding: 100px 40px 90px; max-width: 1180px; margin: 0 auto; }
+  .agent .section-head p code {
+    font-family: var(--mono); font-size: 13px; color: #C7CEEA;
+    background: var(--ink-raised); padding: 2px 6px; border-radius: 5px;
+  }
+  .terminal-shell { max-width: 720px; margin: 46px auto 0; }
+  .terminal {
+    background: #05070d; border: 1px solid var(--ink-line); border-radius: 16px;
+    overflow: hidden; box-shadow: 0 30px 80px -30px rgba(0,0,0,0.75);
+  }
+  .terminal .bar {
+    display: flex; align-items: center; gap: 8px; padding: 13px 16px;
+    border-bottom: 1px solid var(--ink-line); background: var(--ink-raised);
+  }
+  .terminal .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .terminal .dot.r { background: #FF5F57; }
+  .terminal .dot.y { background: #FEBC2E; }
+  .terminal .dot.g { background: #28C840; }
+  .terminal .filename { margin-left: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .terminal pre {
+    margin: 0; padding: 26px 28px 30px; font-family: var(--mono); font-size: 12.5px;
+    line-height: 1.75; color: #C7CEEA; overflow-x: auto; white-space: pre;
+  }
+  .terminal .t-prompt { color: var(--muted); }
+  .terminal .t-cmd { color: #fff; }
+  .terminal .t-tag { color: var(--muted); }
+  .terminal .t-op { color: var(--accent); }
+  .terminal .t-ok { color: var(--ok); }
+  .terminal .t-key { color: #8FB8FF; }
+  .terminal .t-str { color: #C7CEEA; }
+  .terminal .t-num { color: var(--ok); }
+
   /* ---------- proof ---------- */
   .proof { padding: 100px 40px 110px; max-width: 1180px; margin: 0 auto; }
   .proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 46px; background: var(--ink-line); border: 1px solid var(--ink-line); border-radius: 18px; overflow: hidden; }
@@ -314,6 +350,7 @@
     <a href="#moment">The moment</a>
     <a href="#why">Why it matters</a>
     <a href="#architecture">Architecture</a>
+    <a href="#agent">Agents</a>
     <a href="#proof">Proof</a>
     <a href="https://tap-xyz.vercel.app" target="_blank" rel="noreferrer">Live demo ↗</a>
   </div>
@@ -438,6 +475,41 @@
       <h3>Arbitrum</h3>
       <p>Transfers land as USDC on Arbitrum One, sourced from wherever the sender's value lives.</p>
       <div class="arrow">→</div>
+    </div>
+  </div>
+</section>
+
+<section class="agent" id="agent">
+  <div class="section-head reveal" style="padding:0;">
+    <div class="eyebrow">Beyond humans</div>
+    <h2>The same account also pays a machine.</h2>
+    <p>No screen for this one, on purpose — there isn't one. An agent hits a 402, pays $0.02 in USDC on Arbitrum through the exact same Universal Account primitives as every transfer above, and gets the resource back. <code>scripts/agent-demo.mjs</code> against <code>/api/agent/resource</code> — real x402, end to end, no human in the loop.</p>
+  </div>
+  <div class="terminal-shell reveal">
+    <div class="terminal">
+      <div class="bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="filename">scripts/agent-demo.mjs</span>
+      </div>
+      <pre><span class="t-prompt">$</span> <span class="t-cmd">node scripts/agent-demo.mjs</span>
+<span class="t-tag">[agent]</span> <span class="t-op">identity</span>:  0x71C7...9F3a
+<span class="t-tag">[agent]</span> <span class="t-op">request</span>:   GET /api/agent/resource (no payment attached)
+<span class="t-tag">[agent]</span> <span class="t-op">402</span>:       price $0.02 USDC on arbitrum-one → 0x8f3C...4b21
+<span class="t-tag">[agent]</span> <span class="t-op">pay</span>:       sending $0.02 USDC on Arbitrum…
+<span class="t-tag">[agent]</span> <span class="t-op">paid</span>:      tx 0x4a91...e07c
+<span class="t-tag">[agent]</span> <span class="t-op">retry</span>:     attempt 1 — GET with proof attached
+
+<span class="t-ok">200</span> — payment verified, resource released:
+
+{
+  <span class="t-key">"paidWith"</span>: { <span class="t-key">"transactionId"</span>: <span class="t-str">"0x4a91...e07c"</span>, <span class="t-key">"amountUsd"</span>: <span class="t-num">0.02</span> },
+  <span class="t-key">"resource"</span>: {
+    <span class="t-key">"headline"</span>: <span class="t-str">"tap agent-to-agent demo resource"</span>,
+    <span class="t-key">"insight"</span>: <span class="t-str">"This response only exists because an agent paid for it —
+                no account, no API key, no human involved."</span>,
+    <span class="t-key">"generatedAt"</span>: <span class="t-str">"2026-07-18T09:42:11.000Z"</span>
+  }
+}</pre>
     </div>
   </div>
 </section>
