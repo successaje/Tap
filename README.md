@@ -14,6 +14,7 @@ Built for the **UXmaxx Hackathon** (Encode × Particle Network).
 
 > **Live demo:** [tap-xyz.vercel.app](https://tap-xyz.vercel.app/)
 > **Walkthrough:** open the link on your phone → tap to claim → sign in with Google → watch it land.
+> **One-pager:** [successaje.github.io/Tap](https://successaje.github.io/Tap/) — an interactive overview with real screens from the app, for anyone reviewing on desktop.
 
 **Track: Universal Accounts Track.** Every transfer in this product is a
 Particle Universal Account operation in EIP-7702 mode — the chain-agnostic
