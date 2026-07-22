@@ -186,6 +186,17 @@ heading — and unlike when this was purely a roadmap item, the core payment
 mechanism is no longer a research question, since the proof of concept above
 already moves real money on a 402 challenge/response.
 
+### D. Local cash-in / cash-out rails
+Both the Withdraw screen and the Deposit sheet already ship a "Bank
+transfer" / "Debit card" rail marked `live: false` — the product has always
+pointed at this direction, just not built it. Full design in
+[`RAMP.md`](RAMP.md): a licensed on/off-ramp partner (Yellow Card, starting
+with Nigeria) sits behind those rails so USDC on Arbitrum can become real
+NGN in a bank account and back, without tap taking on the VASP licensing
+that would require. Gated by a B2B partner-onboarding process, not by
+implementation cost — see that document for why this is the one roadmap
+item that also breaks tap's "no durable server-side state" architecture.
+
 ### Relative priority
 
 Ordered by implementation cost and time to ship, independent of long-term
@@ -201,6 +212,12 @@ strategic value:
    already exists (see above); what's left is agent identity delegation
    and production-grade payment verification, not a research phase before
    implementation can begin.
+
+Not ordered on the same axis: **local cash-in/cash-out rails** (D above) is
+fully designed and could be the most consequential of all four — it's the
+"then what happens after the money lands" answer the product currently
+lacks — but its timeline is set by a partner's onboarding pipeline, not by
+tap's own implementation speed.
 
 None of these directions require modification to the core payment
 architecture currently in production.
