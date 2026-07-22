@@ -10,8 +10,22 @@ import { recordActivity, timeAgo } from "@/lib/activity";
 import { formatCurrency, getExchangeRates, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { getSettings, updateSettings, type Settings as UserSettings } from "@/lib/settings";
 import { subscribeToPush, isSubscribed, triggerTestPush } from "@/lib/push";
+import { getUsernameForAddress, claimUsername } from "@/lib/username";
+import { getBeneficiaries, removeBeneficiary, type Beneficiary } from "@/lib/beneficiaries";
 import { ReceiveSheet } from "@/components/receive-sheet";
-import { ChevronDown, Coins, Terminal, ArrowLeft, QrCode, ShieldCheck, Bell, BellRing } from "lucide-react";
+import {
+  ChevronDown,
+  Coins,
+  Terminal,
+  ArrowLeft,
+  QrCode,
+  ShieldCheck,
+  Bell,
+  BellRing,
+  AtSign,
+  BookUser,
+  Trash2,
+} from "lucide-react";
 
 const shorten = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -28,6 +42,11 @@ export default function ProfilePage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
   const [pushToast, setPushToast] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [claimingUsername, setClaimingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
 
   function showPushToast(message: string) {
     setPushToast(message);
@@ -52,11 +71,14 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    setUser(getUser());
+    const u = getUser();
+    setUser(u);
     setLinks(getSentLinks().filter((l) => !l.reclaimed && !l.claimed));
     setSettings(getSettings());
+    setBeneficiaries(getBeneficiaries());
     getExchangeRates().then(setRates);
     isSubscribed().then(setPushEnabled);
+    if (u?.address) getUsernameForAddress(u.address).then(setUsername);
     // The local records only learn a link was claimed when something re-checks
     // the chain — that used to happen only on Home, so a link claimed since
     // the last Home visit kept showing here as reclaimable. Re-check on entry.
@@ -194,6 +216,72 @@ export default function ProfilePage() {
             </div>
             <ChevronDown size={18} className="-rotate-90 text-slate-300" />
           </button>
+        )}
+
+        {/* Username — lets others send directly, no address or link needed */}
+        {user?.address && (
+          <section>
+            <h3 className="ml-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <AtSign size={14} /> Username
+            </h3>
+            <div className="mt-3 rounded-3xl border border-slate-100 bg-white px-5 py-4 shadow-ios">
+              {username ? (
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">@{username}</p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-400">
+                    Anyone can send to you with this — no address, no link.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-slate-400">
+                    Claim a username so others can send to you directly.
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1 rounded-2xl bg-slate-50 px-3 py-2">
+                      <span className="text-sm font-semibold text-slate-400">@</span>
+                      <input
+                        value={usernameInput}
+                        onChange={(e) => {
+                          setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""));
+                          setUsernameError(null);
+                        }}
+                        placeholder="yourname"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        className="min-w-0 flex-1 bg-transparent py-1 font-mono text-sm text-slate-900 outline-none placeholder:text-slate-300"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!user?.address || usernameInput.length < 3 || claimingUsername) return;
+                        haptic(10);
+                        setClaimingUsername(true);
+                        setUsernameError(null);
+                        const result = await claimUsername(usernameInput, user.address);
+                        setClaimingUsername(false);
+                        if (result.ok) setUsername(usernameInput);
+                        else
+                          setUsernameError(
+                            result.reason === "taken"
+                              ? "That username's taken."
+                              : "Couldn't claim that username."
+                          );
+                      }}
+                      disabled={usernameInput.length < 3 || claimingUsername}
+                      className="shrink-0 rounded-2xl bg-accent px-4 py-2.5 text-xs font-semibold text-white transition-transform active:scale-95 disabled:opacity-40"
+                    >
+                      {claimingUsername ? "Claiming…" : "Claim"}
+                    </button>
+                  </div>
+                  {usernameError && (
+                    <p className="mt-2 text-xs font-medium text-red-500">{usernameError}</p>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
         )}
 
         {/* Preferences */}
@@ -335,6 +423,46 @@ export default function ProfilePage() {
                   {errors[l.id] && (
                     <p className="mt-3 text-xs font-medium text-red-500">{errors[l.id]}</p>
                   )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Saved recipients — set from the Withdraw screen after a send */}
+        <section>
+          <h3 className="ml-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <BookUser size={14} /> Saved recipients
+          </h3>
+          {beneficiaries.length === 0 ? (
+            <p className="mt-3 px-2 text-sm font-medium text-slate-500">
+              None yet — save one after your next send to a username or address.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {beneficiaries.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex items-center gap-3 rounded-3xl border border-slate-100 bg-white px-5 py-4 shadow-ios"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-accent">
+                    {b.label[0]?.toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">{b.label}</p>
+                    <p className="font-mono text-xs text-slate-400">{shorten(b.address)}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      haptic(10);
+                      removeBeneficiary(b.id);
+                      setBeneficiaries(getBeneficiaries());
+                    }}
+                    aria-label={`Remove ${b.label}`}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors active:bg-slate-100"
+                  >
+                    <Trash2 size={16} strokeWidth={2} />
+                  </button>
                 </li>
               ))}
             </ul>

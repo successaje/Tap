@@ -16,7 +16,7 @@ import { getActivity, pruneDemoArtifacts, timeAgo, type ActivityItem } from "@/l
 import { formatUsd } from "@/lib/mock";
 import { formatCurrency, getExchangeRates } from "@/lib/currency";
 import { getSettings, defaultSettings, type Settings, updateSettings } from "@/lib/settings";
-import { ArrowUpRight, ArrowDownLeft, CornerDownLeft, Eye, EyeOff, Trophy, MessageSquare, Receipt } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, CornerDownLeft, Eye, EyeOff, Trophy, MessageSquare, Receipt, UserRound } from "lucide-react";
 
 const typeMeta: Record<
   ActivityItem["type"],
@@ -205,22 +205,30 @@ export function Home() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0, transition: { ...springs.snappy, delay: 0.2 } }}
-        className="mt-12 grid grid-cols-2 gap-3"
+        className="mt-12 grid grid-cols-3 gap-2.5"
       >
         <motion.button
           whileTap={{ scale: 0.96 }}
           onClick={() => router.push("/send")}
-          className="flex h-14 items-center justify-center gap-2 rounded-full btn-tap text-lg font-semibold text-white"
+          className="flex h-14 flex-col items-center justify-center gap-1 rounded-3xl btn-tap text-xs font-semibold text-white"
         >
-          <ArrowUpRight size={20} strokeWidth={2.5} />
+          <ArrowUpRight size={19} strokeWidth={2.5} />
           Send
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.96 }}
-          onClick={() => router.push("/request")}
-          className="flex h-14 items-center justify-center gap-2 rounded-full bg-slate-100 text-lg font-semibold text-slate-900"
+          onClick={() => router.push("/pay")}
+          className="flex h-14 flex-col items-center justify-center gap-1 rounded-3xl bg-blue-50 text-xs font-semibold text-accent"
         >
-          <ArrowDownLeft size={20} strokeWidth={2.5} />
+          <UserRound size={19} strokeWidth={2.5} />
+          Pay
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => router.push("/request")}
+          className="flex h-14 flex-col items-center justify-center gap-1 rounded-3xl bg-slate-100 text-xs font-semibold text-slate-900"
+        >
+          <ArrowDownLeft size={19} strokeWidth={2.5} />
           Request
         </motion.button>
       </motion.div>

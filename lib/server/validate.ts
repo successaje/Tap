@@ -28,3 +28,10 @@ export const isTxKind = (v: unknown): v is TxKind =>
 // affect the other just because the regex happens to match today.
 export const isReferralCode = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}$/.test(v);
+
+// Must start with a letter (not just hex-looking) so a username can never be
+// mistaken for a link id or a truncated address at a glance. 3-20 chars,
+// lowercase letters/digits/underscore — normalized to lowercase before this
+// ever runs, so the check itself doesn't need to case-fold.
+export const isUsername = (v: unknown): v is string =>
+  typeof v === "string" && /^[a-z][a-z0-9_]{2,19}$/.test(v);

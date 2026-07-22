@@ -12,6 +12,7 @@ import { particleEnabled, transferOnArbitrum, getUnifiedBalance } from "@/lib/pa
 import { recordActivity, type ActivityItem } from "@/lib/activity";
 import { friendlyError } from "@/lib/errors";
 import { recordTransactionStat } from "@/lib/stats";
+import { saveBeneficiary, findBeneficiaryByAddress } from "@/lib/beneficiaries";
 import { ReceiptSheet } from "@/components/receipt-sheet";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
 import { Landmark, CreditCard, Wallet, Check, X, ArrowLeft, ClipboardPaste } from "lucide-react";
@@ -21,6 +22,12 @@ type Phase = "method" | "address" | "amount" | "sending" | "sent" | "error";
 const shorten = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const isAddress = (a: string) => /^0x[0-9a-fA-F]{40}$/.test(a.trim());
 
+/**
+ * Cash out — leaving tap entirely, to an address that may or may not belong
+ * to a person (an exchange, another wallet, a bank rail once those land).
+ * Paying a known person by username or saved recipient lives at /pay
+ * instead — a different intent from "move money off this account."
+ */
 export default function WithdrawPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("method");
@@ -31,6 +38,8 @@ export default function WithdrawPage() {
   const [error, setError] = useState<string | null>(null);
   const [receiptItem, setReceiptItem] = useState<ActivityItem | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [saveLabel, setSaveLabel] = useState("");
+  const [savedBeneficiary, setSavedBeneficiary] = useState(false);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- post-hydration reads */
@@ -359,10 +368,38 @@ export default function WithdrawPage() {
                 View receipt
               </button>
             )}
+
+            {!savedBeneficiary && !findBeneficiaryByAddress(dest) && (
+              <div className="mt-6 w-full max-w-[19rem] rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-ios">
+                <p className="text-xs font-semibold text-slate-500">Save this recipient?</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    value={saveLabel}
+                    onChange={(e) => setSaveLabel(e.target.value)}
+                    placeholder="Nickname"
+                    className="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                  />
+                  <button
+                    onClick={() => {
+                      haptic(10);
+                      saveBeneficiary(saveLabel || shorten(dest.trim()), dest.trim());
+                      setSavedBeneficiary(true);
+                    }}
+                    className="shrink-0 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white transition-transform active:scale-95"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+            {savedBeneficiary && (
+              <p className="mt-4 text-xs font-medium text-emerald-600">Saved ✓ — it&apos;ll show up next time.</p>
+            )}
+
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => router.push("/")}
-              className="mt-12 h-14 w-full rounded-full bg-slate-100 text-lg font-semibold text-slate-800"
+              className="mt-8 h-14 w-full rounded-full bg-slate-100 text-lg font-semibold text-slate-800"
             >
               Done
             </motion.button>

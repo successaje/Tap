@@ -226,3 +226,43 @@ export async function getReferralStats(
   );
   return { points: Number(data?.points ?? 0), count: Number(data?.count ?? 0) };
 }
+
+const USERNAME_HANDLE_KEY = (username: string) => `username:handle:${username.toLowerCase()}`;
+const USERNAME_OWNER_KEY = (address: string) => `username:owner:${address.toLowerCase()}`;
+
+/**
+ * One active handle per address. Claiming re-points the reverse index and
+ * frees any previous handle that address held, so a user can change their
+ * username without a stale one lingering as unusable dead weight. Claiming
+ * your own already-claimed handle again is a harmless no-op success, since
+ * the Profile UI re-submits the current value along with any other field.
+ */
+export async function claimUsername(
+  username: string,
+  address: string
+): Promise<{ ok: boolean; reason?: "taken" }> {
+  if (!redis) return { ok: false };
+  const owner = await redis.get<string>(USERNAME_HANDLE_KEY(username));
+  if (owner && owner !== address.toLowerCase()) {
+    return { ok: false, reason: "taken" };
+  }
+  const previous = await redis.get<string>(USERNAME_OWNER_KEY(address));
+  if (previous && previous !== username.toLowerCase()) {
+    await redis.del(USERNAME_HANDLE_KEY(previous));
+  }
+  await redis.set(USERNAME_HANDLE_KEY(username), address.toLowerCase());
+  await redis.set(USERNAME_OWNER_KEY(address), username.toLowerCase());
+  return { ok: true };
+}
+
+/** Resolve @username → address, for the send flow. */
+export async function resolveUsername(username: string): Promise<string | null> {
+  if (!redis) return null;
+  return (await redis.get<string>(USERNAME_HANDLE_KEY(username))) ?? null;
+}
+
+/** Reverse lookup, for Profile to show "you are @…". */
+export async function getUsernameForAddress(address: string): Promise<string | null> {
+  if (!redis) return null;
+  return (await redis.get<string>(USERNAME_OWNER_KEY(address))) ?? null;
+}
