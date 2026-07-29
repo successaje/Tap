@@ -202,8 +202,8 @@ Application state lives in three places:
     account can't retroactively generate a referral. The referrer is
     credited once the referred account completes its first real send.
   - **Real usage numbers.** A running count and USD total per transaction
-    kind, exposed at `/api/stats`, used to report genuine traction rather
-    than an estimate.
+    kind, plus a real sign-up counter, exposed at `/api/stats`, used to
+    report genuine traction rather than an estimate.
 
   All of the above are best-effort: a failed write only costs a missed
   notification or an uncredited referral, never a broken transfer.
@@ -238,12 +238,16 @@ the same primitives, paying a machine instead of a human.
 
 **Adoption potential** tap targets people who don't have a wallet
 and don't want one — a larger audience than link-payment products aimed at
-crypto-native users. A real transaction counter at
-[`/api/stats`](https://tap-xyz.vercel.app/api/stats) backs this with actual
-usage rather than a projection: every number there is recorded by
-application code the moment a real transfer succeeds, nothing estimated.
-Referral attribution, background push notifications, and a rewards system
-are real, working retention mechanisms, not placeholders.
+crypto-native users. A real transaction counter — and a real sign-up
+counter — at [`/api/stats`](https://tap-xyz.vercel.app/api/stats) backs
+this with actual usage rather than a projection: every number there is
+recorded by application code the moment a real transfer or a real
+first-run signup happens, nothing estimated. The sign-up count is also the
+more telling of the two — it comes entirely from people who found and
+signed into the app on their own after it was shared publicly, not from
+the founder's own testing. Referral attribution, background push
+notifications, and a rewards system are real, working retention
+mechanisms, not placeholders.
 
 **Technical quality and polish** A dedicated security pass added
 input validation and rate limiting to every server endpoint

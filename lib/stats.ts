@@ -14,3 +14,12 @@ export function recordTransactionStat(kind: TxKind, amountUsd: number) {
     body: JSON.stringify({ kind, amountUsd }),
   }).catch(() => {});
 }
+
+/** Fire once, at first-run onboarding completion — see app/page.tsx. */
+export function recordSignupStat() {
+  fetch("/api/stats", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event: "signup" }),
+  }).catch(() => {});
+}

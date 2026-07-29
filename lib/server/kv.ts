@@ -123,6 +123,26 @@ export async function getStats(): Promise<Record<string, number>> {
   return out;
 }
 
+const SIGNUP_COUNT_KEY = "stats:signups";
+
+/**
+ * A separate counter from TX_KINDS above — a signup has no amountUsd, and
+ * conflating "how many accounts exist" with "how much money moved" would
+ * make both numbers harder to reason about. Fired once, at first-run
+ * onboarding completion (see app/page.tsx) — the same trigger point
+ * capturePendingReferral already uses, so a returning sign-in never
+ * recounts an existing account.
+ */
+export async function recordSignup(): Promise<void> {
+  if (!redis) return;
+  await redis.incr(SIGNUP_COUNT_KEY);
+}
+
+export async function getSignupCount(): Promise<number> {
+  if (!redis) return 0;
+  return Number((await redis.get<number>(SIGNUP_COUNT_KEY)) ?? 0);
+}
+
 const AGENT_CHALLENGE_KEY = (id: string) => `agent:challenge:${id}`;
 const AGENT_CHALLENGE_TTL_SECONDS = 300;
 

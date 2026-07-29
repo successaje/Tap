@@ -10,6 +10,7 @@ import { getUser, hasPendingResume } from "@/lib/auth";
 import { isOnboarded, markOnboarded, type MockUser } from "@/lib/store";
 import { demoLink } from "@/lib/mock";
 import { stashPendingReferralCode, capturePendingReferral } from "@/lib/referrals";
+import { recordSignupStat } from "@/lib/stats";
 
 type View = "loading" | "landing" | "demo" | "onboarding" | "home";
 
@@ -66,6 +67,7 @@ export default function Root() {
           user={user}
           onDone={() => {
             markOnboarded();
+            recordSignupStat();
             if (user?.address) capturePendingReferral(user.address);
             window.dispatchEvent(new Event("tap:auth"));
             setView("home");

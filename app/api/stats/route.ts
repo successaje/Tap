@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { recordTransaction, getStats, checkRateLimit, kvConfigured, TX_KINDS } from "@/lib/server/kv";
+import {
+  recordTransaction,
+  getStats,
+  recordSignup,
+  getSignupCount,
+  checkRateLimit,
+  kvConfigured,
+  TX_KINDS,
+} from "@/lib/server/kv";
 import { isReasonableAmount, isTxKind } from "@/lib/server/validate";
 
 /**
@@ -11,9 +19,9 @@ import { isReasonableAmount, isTxKind } from "@/lib/server/validate";
  */
 export async function GET() {
   if (!kvConfigured) {
-    return NextResponse.json({ configured: false, count: 0, volumeUsd: 0, byKind: {} });
+    return NextResponse.json({ configured: false, count: 0, volumeUsd: 0, byKind: {}, signups: 0 });
   }
-  const stats = await getStats();
+  const [stats, signups] = await Promise.all([getStats(), getSignupCount()]);
   let count = 0;
   let volumeUsd = 0;
   const byKind: Record<string, { count: number; volumeUsd: number }> = {};
@@ -24,7 +32,7 @@ export async function GET() {
     count += kindCount;
     volumeUsd += kindVolume;
   }
-  return NextResponse.json({ configured: true, count, volumeUsd, byKind });
+  return NextResponse.json({ configured: true, count, volumeUsd, byKind, signups });
 }
 
 export async function POST(req: Request) {
@@ -32,13 +40,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, persisted: false });
   }
   try {
-    const { kind, amountUsd } = await req.json();
-    if (!isTxKind(kind) || !isReasonableAmount(amountUsd)) {
-      return NextResponse.json({ error: "Invalid fields" }, { status: 400 });
-    }
+    const body = await req.json();
     // No session to key a rate limit on — best available proxy is the
     // client's IP via the platform-forwarded header.
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+    if (body.event === "signup") {
+      if (!(await checkRateLimit("stats-signup", ip, 10, 600))) {
+        return NextResponse.json({ success: true, persisted: false });
+      }
+      await recordSignup();
+      return NextResponse.json({ success: true, persisted: true });
+    }
+
+    const { kind, amountUsd } = body;
+    if (!isTxKind(kind) || !isReasonableAmount(amountUsd)) {
+      return NextResponse.json({ error: "Invalid fields" }, { status: 400 });
+    }
     if (!(await checkRateLimit("stats", ip, 60, 600))) {
       return NextResponse.json({ success: true, persisted: false });
     }
