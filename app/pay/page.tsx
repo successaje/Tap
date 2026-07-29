@@ -19,6 +19,7 @@ import {
   findBeneficiaryByAddress,
   type Beneficiary,
 } from "@/lib/beneficiaries";
+import { getSplitState, recordSplitContribution, type SplitState } from "@/lib/split";
 import { DepositSheet } from "@/components/deposit-sheet";
 import { ReceiptSheet } from "@/components/receipt-sheet";
 import { formatUsd, formatLocalInput, localToUsd, usdToLocal } from "@/lib/mock";
@@ -61,6 +62,7 @@ export default function PayPage() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [receiptItem, setReceiptItem] = useState<ActivityItem | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [splitInfo, setSplitInfo] = useState<SplitState | null>(null);
 
   const [handle, setHandle] = useState("");
   const [resolving, setResolving] = useState(false);
@@ -73,11 +75,21 @@ export default function PayPage() {
     /* eslint-disable react-hooks/set-state-in-effect -- post-hydration URL + storage read */
     const q = new URLSearchParams(window.location.search);
     const to = q.get("to");
+    const splitId = q.get("splitId");
     const u = getUser();
     setUser(u);
     setBeneficiaries(getBeneficiaries());
 
-    if (!to) {
+    if (splitId) {
+      getSplitState(splitId).then((split) => {
+        if (!split) {
+          setReq(null); // an expired or invalid split link
+          return;
+        }
+        setSplitInfo(split);
+        setReq({ to: split.ownerAddress, from: split.ownerName, amountUsd: 0, note: split.note });
+      });
+    } else if (!to) {
       setStandalone(true);
       setPhase("recipient");
       setReq(null);
@@ -179,6 +191,9 @@ export default function PayPage() {
         status: "settled",
         explorerUrl: url ?? undefined,
       });
+      if (splitInfo) {
+        recordSplitContribution(splitInfo.id, numericUsd, user?.name || "Someone");
+      }
       setReceiptItem(recorded);
       haptic([0, 30, 40, 60]);
       setPhase("paid");
@@ -221,7 +236,7 @@ export default function PayPage() {
           <span className="size-10" />
         )}
         <p className="font-semibold">
-          {phase === "recipient" ? "Pay someone" : `Pay ${req?.from ?? ""}`}
+          {phase === "recipient" ? "Pay someone" : splitInfo ? "Split" : `Pay ${req?.from ?? ""}`}
         </p>
         <span className="size-10" />
       </header>
@@ -323,8 +338,36 @@ export default function PayPage() {
                 {req.from[0]}
               </motion.div>
               <motion.p variants={rise} className="mt-5 text-lg text-slate-500">
-                {standalone ? `Paying ${req.from}` : `${req.from} ${fixed ? "requests" : "wants to get paid"}`}
+                {splitInfo
+                  ? `${req.from}'s split`
+                  : standalone
+                    ? `Paying ${req.from}`
+                    : `${req.from} ${fixed ? "requests" : "wants to get paid"}`}
               </motion.p>
+
+              {splitInfo && (
+                <motion.div variants={rise} className="mt-4 w-full max-w-[16rem]">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all"
+                      style={{
+                        width: `${Math.min(100, (splitInfo.collectedUsd / splitInfo.targetUsd) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs font-medium text-slate-500">
+                    {formatUsd(splitInfo.collectedUsd)} of {formatUsd(splitInfo.targetUsd)}
+                    {splitInfo.payerCount > 0 &&
+                      ` · ${splitInfo.payerCount} ${splitInfo.payerCount === 1 ? "person has" : "people have"} chipped in`}
+                  </p>
+                </motion.div>
+              )}
+
+              {splitInfo && (
+                <motion.p variants={rise} className="mt-1 text-xs text-slate-400">
+                  Enter how much you&apos;re chipping in
+                </motion.p>
+              )}
               <motion.p
                 variants={rise}
                 className={`mt-1 text-6xl font-semibold leading-none tracking-tighter tabular-nums ${
@@ -371,7 +414,7 @@ export default function PayPage() {
                   disabled={numericLocal <= 0}
                   className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-40"
                 >
-                  Pay {numericLocal > 0 ? formatUsd(numericUsd) : ""}
+                  {splitInfo ? "Chip in" : "Pay"} {numericLocal > 0 ? formatUsd(numericUsd) : ""}
                 </motion.button>
               )
             ) : (

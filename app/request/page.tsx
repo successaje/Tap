@@ -7,14 +7,21 @@ import { Keypad, applyKey } from "@/components/keypad";
 import { PaymentQR } from "@/components/qr";
 import { springs, haptic } from "@/lib/motion";
 import { getUser, type AppUser } from "@/lib/auth";
+import { createSplit } from "@/lib/split";
 import { formatUsd, formatLocalInput, localToUsd } from "@/lib/mock";
 
-/** Request money: share a link that opens prefilled pay for the other side. */
+/** Request money: share a link that opens prefilled pay for the other side.
+ * "Split with others" is the same idea extended to more than one payer — a
+ * durable, shared progress record (lib/split.ts) instead of a fixed amount
+ * only one person is expected to fulfill. */
 export default function RequestPage() {
   const router = useRouter();
   const [user, setUser] = useState<AppUser | null | undefined>(undefined);
   const [amount, setAmount] = useState("0");
   const [note, setNote] = useState("");
+  const [split, setSplit] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [splitError, setSplitError] = useState<string | null>(null);
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -25,10 +32,25 @@ export default function RequestPage() {
 
   const numericLocal = parseFloat(amount) || 0;
   const numericUsd = localToUsd(numericLocal);
+  const canCreate = !split || numericUsd > 0;
 
-  function create() {
-    if (!user?.address) return;
+  async function create() {
+    if (!user?.address || !canCreate || creating) return;
     haptic(20);
+
+    if (split) {
+      setCreating(true);
+      setSplitError(null);
+      const result = await createSplit(user.address, user.name || "Someone", numericUsd, note.trim() || undefined);
+      setCreating(false);
+      if (!result.ok || !result.id) {
+        setSplitError("Couldn't create the split — try again.");
+        return;
+      }
+      setCreated(`${window.location.origin}/pay?splitId=${result.id}`);
+      return;
+    }
+
     const params = new URLSearchParams({
       to: user.address,
       from: user.name || "A friend",
@@ -44,8 +66,9 @@ export default function RequestPage() {
       try {
         await navigator.share({
           title: "tap",
-          text:
-            numericLocal > 0
+          text: split
+            ? `Chip in toward ${formatUsd(numericUsd)} on tap`
+            : numericLocal > 0
               ? `Requesting ${formatUsd(numericUsd)} on tap`
               : "Pay me on tap",
           url,
@@ -74,7 +97,7 @@ export default function RequestPage() {
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
-        <p className="font-semibold">Request</p>
+        <p className="font-semibold">{split ? "Split" : "Request"}</p>
         <span className="size-9" />
       </header>
 
@@ -113,7 +136,9 @@ export default function RequestPage() {
                   {formatLocalInput(numericLocal)}
                 </motion.p>
                 <p className="mt-2 text-xs text-slate-400">
-                  Leave at $0.00 to let them choose the amount
+                  {split
+                    ? "The target everyone's contributing toward"
+                    : "Leave at $0.00 to let them choose the amount"}
                 </p>
                 <input
                   value={note}
@@ -122,6 +147,29 @@ export default function RequestPage() {
                   placeholder="What's it for?"
                   className="mt-4 rounded-full bg-slate-100 px-4 py-2 text-center text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 />
+
+                <button
+                  onClick={() => {
+                    haptic(10);
+                    setSplit((s) => !s);
+                    setSplitError(null);
+                  }}
+                  className={`mt-4 flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+                    split ? "bg-accent text-white" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  <span
+                    className={`flex size-4 items-center justify-center rounded-full border ${
+                      split ? "border-white bg-white/20" : "border-slate-300"
+                    }`}
+                  >
+                    {split && "✓"}
+                  </span>
+                  Split with others
+                </button>
+                {splitError && (
+                  <p className="mt-2 text-xs font-medium text-red-500">{splitError}</p>
+                )}
               </div>
 
               <Keypad onKey={(k) => setAmount((p) => applyKey(p, k))} />
@@ -130,9 +178,10 @@ export default function RequestPage() {
                 whileTap={{ scale: 0.97 }}
                 transition={springs.snappy}
                 onClick={create}
-                className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
+                disabled={!canCreate || creating}
+                className="mt-3 h-14 w-full rounded-full btn-tap text-lg font-semibold text-white disabled:opacity-40"
               >
-                Create request
+                {creating ? "Creating…" : split ? "Create split" : "Create request"}
               </motion.button>
             </motion.div>
           ) : (
@@ -150,16 +199,18 @@ export default function RequestPage() {
                 🙌
               </motion.div>
               <h2 className="mt-5 text-2xl font-semibold tracking-tight">
-                Request ready
+                {split ? "Split ready" : "Request ready"}
               </h2>
               <p className="mt-1 text-slate-500">
-                {numericLocal > 0
-                  ? `Asking for ${formatUsd(numericUsd)}`
-                  : "They choose the amount"}
+                {split
+                  ? `Collecting toward ${formatUsd(numericUsd)} — anyone with this link can chip in`
+                  : numericLocal > 0
+                    ? `Asking for ${formatUsd(numericUsd)}`
+                    : "They choose the amount"}
               </p>
 
               <div className="mt-6">
-                <PaymentQR value={created} caption="Scan to pay you" />
+                <PaymentQR value={created} caption={split ? "Scan to chip in" : "Scan to pay you"} />
               </div>
 
               <button
@@ -180,7 +231,7 @@ export default function RequestPage() {
                   onClick={() => share(created)}
                   className="h-14 w-full rounded-full btn-tap text-lg font-semibold text-white"
                 >
-                  {copied ? "Copied!" : "Share request"}
+                  {copied ? "Copied!" : split ? "Share split" : "Share request"}
                 </motion.button>
                 <button
                   onClick={() => router.push("/")}

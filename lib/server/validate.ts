@@ -35,3 +35,8 @@ export const isReferralCode = (v: unknown): v is string =>
 // ever runs, so the check itself doesn't need to case-fold.
 export const isUsername = (v: unknown): v is string =>
   typeof v === "string" && /^[a-z][a-z0-9_]{2,19}$/.test(v);
+
+// Same shape convention as isLinkId — 8 lowercase hex chars, generated
+// client-side the same way link ids are.
+export const isSplitId = (v: unknown): v is string =>
+  typeof v === "string" && /^[0-9a-f]{8}$/.test(v);

@@ -286,3 +286,97 @@ export async function getUsernameForAddress(address: string): Promise<string | n
   if (!redis) return null;
   return (await redis.get<string>(USERNAME_OWNER_KEY(address))) ?? null;
 }
+
+export interface SplitRecord {
+  id: string;
+  ownerAddress: string;
+  ownerName: string;
+  targetUsd: number;
+  note?: string;
+  createdAt: string;
+}
+
+export interface SplitContribution {
+  label: string;
+  amountUsd: number;
+  at: string;
+}
+
+export interface SplitState extends SplitRecord {
+  collectedUsd: number;
+  payerCount: number;
+  recentContributions: SplitContribution[];
+}
+
+const SPLIT_KEY = (id: string) => `split:${id}`;
+const SPLIT_TOTAL_KEY = (id: string) => `split:${id}:total`;
+const SPLIT_PAYER_COUNT_KEY = (id: string) => `split:${id}:payerCount`;
+const SPLIT_PAYERS_KEY = (id: string) => `split:${id}:payers`;
+const MAX_SPLIT_CONTRIBUTIONS_KEPT = 50;
+
+/**
+ * A split is a request more than one person can pay into — the durable
+ * state a link-based Request doesn't need, since only one payer is ever
+ * involved there. Unlike everything else in this file, this state is not
+ * best-effort: it's the only shared record of "how much has this group
+ * collected," which every payer's device needs to see the same answer to,
+ * so a failed write here would show different people different progress.
+ * Still no escrow, though — each contribution is a normal direct transfer
+ * straight to the owner's own address (see app/pay), same as any other
+ * Pay; this record only tracks progress, it never holds funds itself.
+ */
+export async function createSplit(record: SplitRecord): Promise<boolean> {
+  if (!redis) return false;
+  await redis.set(SPLIT_KEY(record.id), JSON.stringify(record));
+  return true;
+}
+
+export async function getSplit(id: string): Promise<SplitState | null> {
+  if (!redis) return null;
+  const raw = await redis.get<string | SplitRecord>(SPLIT_KEY(id));
+  if (!raw) return null;
+  const record = typeof raw === "string" ? (JSON.parse(raw) as SplitRecord) : raw;
+  const [total, payerCount, entries] = await Promise.all([
+    redis.get<string | number>(SPLIT_TOTAL_KEY(id)),
+    redis.get<string | number>(SPLIT_PAYER_COUNT_KEY(id)),
+    redis.lrange<string>(SPLIT_PAYERS_KEY(id), 0, MAX_SPLIT_CONTRIBUTIONS_KEPT - 1),
+  ]);
+  const recentContributions = (entries ?? [])
+    .map((e) => {
+      try {
+        return typeof e === "string" ? (JSON.parse(e) as SplitContribution) : (e as SplitContribution);
+      } catch {
+        return null;
+      }
+    })
+    .filter((e): e is SplitContribution => !!e);
+  return {
+    ...record,
+    collectedUsd: Number(total) || 0,
+    payerCount: Number(payerCount) || 0,
+    recentContributions,
+  };
+}
+
+/** Records one real payment toward a split's target — called after the
+ * underlying transfer already succeeded, same ordering as every other
+ * stat-recording call in this app. `recentContributions` is capped
+ * (MAX_SPLIT_CONTRIBUTIONS_KEPT) for display, but payerCount is tracked as
+ * its own counter so it stays exact past that cap. */
+export async function recordSplitContribution(
+  id: string,
+  amountUsd: number,
+  label: string
+): Promise<boolean> {
+  if (!redis) return false;
+  const exists = await redis.exists(SPLIT_KEY(id));
+  if (!exists) return false;
+  const entry: SplitContribution = { label, amountUsd, at: new Date().toISOString() };
+  await Promise.all([
+    redis.incrbyfloat(SPLIT_TOTAL_KEY(id), amountUsd),
+    redis.incr(SPLIT_PAYER_COUNT_KEY(id)),
+    redis.lpush(SPLIT_PAYERS_KEY(id), JSON.stringify(entry)),
+  ]);
+  await redis.ltrim(SPLIT_PAYERS_KEY(id), 0, MAX_SPLIT_CONTRIBUTIONS_KEPT - 1);
+  return true;
+}
