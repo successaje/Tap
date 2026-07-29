@@ -1,6 +1,6 @@
 <div align="center">
   <img src="public/brand/tap-logo-light.svg" alt="tap" height="72" />
-  <h1>tap — send money with a link. no chains, no wallets, no idea it's crypto.</h1>
+  <h1>tap — send money with a link. no chains, no wallets, no idea it's crypto. </h1>
   <p><em>Consumer-simple on the surface. Chain-abstracted underneath.</em></p>
 </div>
 
